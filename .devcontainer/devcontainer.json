@@ -1,0 +1,10 @@
+{
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USER_ID": "1000",
+      "GROUP_ID": "1000"
+    }
+  },
+  "remoteUser": "user"
+}   
