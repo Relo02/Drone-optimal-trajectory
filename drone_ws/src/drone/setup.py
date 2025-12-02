@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/start_mission_commander.launch.py'])
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +25,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'my_node = drone.my_node:main'
+            'my_node = drone.my_node:main',
+            'mission_commander = drone.mission_commander:main',
+            'simple_px4_commander = drone.simple_px4_commander:main',
         ],
     },
 )

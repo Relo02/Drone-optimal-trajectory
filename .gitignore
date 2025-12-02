@@ -1,2 +1,5 @@
 trajectory_opt/myenv
 trajectory_opt/__pycache__
+drone_ws/build/
+drone_ws/install/
+drone_ws/log/
