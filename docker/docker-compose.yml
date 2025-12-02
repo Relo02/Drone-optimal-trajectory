@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Main service with PX4 SITL + Gazebo + ROS2 (now uses new Gazebo by default)
   drone-control:
     build:
       context: ..
