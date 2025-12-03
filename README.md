@@ -128,80 +128,62 @@ What the demo does
 
 ## Suggested extensions / improvements
 
-- Replace the placeholder `model.DroneModel.dynamics()` with a proper linearization of a full nonlinear model (or export linearized A,B around operating point).
 - Add state constraints (e.g., position or velocity limits) and model them as linear constraints in OSQP.
 - Include disturbance handling or a soft-constraint terminal set (MPC with constraint tightening).
-- Pre-factor or cache the sparse structure of H (if A,B constant) to avoid re-creating sparse matrices every iteration — only update `q`.
+- Add obstacle avoidance constraints coming from the VO SLAM.
 - Add logging and unit tests for `build_prediction_matrices` and `build_qp_in_u_terminal_goal`.
 
 ---
 
 ## How to run the ROS2 simulation environment (quick guide)
 
-This project contains a separate, full ROS2 simulation environment located at `../Ros-2-Environment`. That environment packages PX4 SITL, Gazebo (gz), MAVROS, and helper launch scripts. Below are high-level steps to start the ROS2-based simulation used by the workspace.
+This project contains a separate, full ROS2 simulation environment. That environment packages PX4 SITL, Gazebo (gz) and helper launch scripts. Below are high-level steps to start the ROS2-based simulation used by the workspace.
+Ros2 works as a middleware for handling the trajectory planning and the simulated VO SLAM implemented inside the `trajectory_opt` folder.
 
 1) Use the provided Docker setup (recommended)
 
 ```bash
-cd /path/to/Ros-2-Environment/drone_control_ws/docker
-
 # Allow GUI forwarding (on host)
 xhost +
 
-# Build and run the docker-compose service (named `drone-control` in the repo)
+cd /path/to/Drone-optimal-trajectory/docker
+
+# Build and run the docker-compose service (named `drone-control`)
 docker-compose build drone-control
-docker-compose up -d drone-control
-docker-compose exec drone-control bash
+
+# Run the compose service
+./run_container.sh
 ```
 
 Inside the container you can use the helper scripts. Common useful scripts (located in `drone_control_ws/docker` or `/usr/local/bin/` inside the container):
 
-- `launch_px4_gz_x500.sh` — launches PX4 SITL with the x500 Gazebo model
-- `launch_gazebo_x500_auto.sh` — launch Gazebo only (for controller development)
-- `launch_mavros.sh` — start MAVROS and connect to PX4 SITL
+- `run_px4_sitl.sh` — launches PX4 SITL with the x500 Gazebo model
+- `start_uros_agent.sh` — starts Micro XRCE-DDS Agent for DDS communication protocol between px4 and ros2
 
-2) Alternatively, run locally (native) if you have ROS2 Humble/Foxy and PX4 sources installed.
-
-High-level steps (native):
+Once inside the container, run px4 and gazebo
 
 ```bash
 # Source ROS2
 source /opt/ros/humble/setup.bash
 
-# Build the workspace (if you changed packages)
-cd /path/to/Ros-2-Environment/drone_control_ws
-colcon build
-source install/setup.bash
+# Run px4 with gazebo
+cd drone_ws/scripts
+./run_px4_sitl.sh
 
-# Launch PX4 SITL with Gazebo (example helper provided)
-./drone_control_ws/docker/launch_px4_gz_x500.sh
-
-# Start MAVROS (if needed)
-ros2 launch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+# In a new terminal, run again the container and enable DDS protocol
+./start_uros_agent.sh
 ```
 
-3) After the whole system is up:
+After the whole system is up:
 
 - Verify PX4 console (`pxh>` prompt) is available.
-- Check MAVROS connection: `ros2 topic echo /mavros/state` (should show connected: true)
-- Run your ROS2 nodes (e.g., `mission_commander` from the workspace) or publish commands to `/mavros/setpoint_position/local`.
 
-For a full, step-by-step guide see `Ros-2-Environment/README.md` which contains container-based quick start and troubleshooting notes.
-
+  
 ---
 
-## Small checklist (to reproduce results)
+## TODO steps
 
-1. Create and activate a Python venv and install `numpy scipy matplotlib osqp`.
-2. Run `trajectory_opt/sim_main.py` to see the MPC demo and plots.
-3. To test with the full ROS2+PX4 simulation, start the Docker container described in `Ros-2-Environment/drone_control_ws/docker` and follow the Quick Start in that repo's README.
+- Test with a simple mission commander if the drone is capable of reaching some desired goals in the ros2 environment
+- Bridge necessary topics that are available in gazebo to ros2 (e.g. camera point cloud topic) and configure rviz2 for viewing the sensors topcis
+- Implement a state machine for checking at which state the drone is at along with the trajectory planner MPC implemented inside the `trajectory_opt` folder example.
 
----
-
-If you want, I can:
-
-- Add a `requirements.txt` in `trajectory_opt` and a one-line `run.sh` helper.
-- Create a `README.md` copy in `Ros-2-Environment/trajectory_opt/` (if you want the same docs there).
-- Implement a small unit test for `build_prediction_matrices` and `build_qp_in_u_terminal_goal`.
-
-Tell me what you'd like next and I will apply it.
