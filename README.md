@@ -167,7 +167,7 @@ Once inside the container, run px4 and gazebo
 source /opt/ros/humble/setup.bash
 
 # Run px4 with gazebo
-cd drone_ws/scripts
+cd scripts/
 ./run_px4_sitl.sh
 
 # In a new terminal, run again the container and enable DDS protocol
