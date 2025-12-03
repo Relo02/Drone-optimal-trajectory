@@ -3,7 +3,7 @@
 This folder contains a simple Model Predictive Control (MPC) demonstration for a quadrotor-like drone. The implementation is a discrete-time, linear time-invariant (LTI) MPC that plans accelerations (and yaw acceleration) over a finite horizon and solves a quadratic program (QP) with OSQP at each control step.
 
 ## Contents
-
+Inside the trajectory optimization folder are available the one step ahead dynamic model and the k-step ahead predictive model. In addition is also present the main code which runs the finite horizon MPC trajectory planner.  
 - `model.py` — DroneModel class: builds discrete dynamics (A,B), constructs prediction matrices (Sx0, Su), and assembles the QP matrices (H, g) for a terminal-goal cost.
 - `sim_main.py` — Simulation and closed-loop receding-horizon MPC example using OSQP. Plots and animates the planned trajectories and actual closed-loop motion.
 
