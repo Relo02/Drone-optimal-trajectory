@@ -151,6 +151,8 @@ cd /path/to/Drone-optimal-trajectory/docker
 # Build and run the docker-compose service (named `drone-control`)
 docker-compose build drone-control
 
+docker-compose up -d drone-control
+
 # Run the compose service
 ./run_container.sh
 ```
