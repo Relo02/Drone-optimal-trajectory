@@ -26,6 +26,8 @@ class DroneModel:
         A[1, 4] = self.Ts
         A[2, 5] = self.Ts
 
+        B[0, 0] = B[1, 1] = B[2, 2] = 0.5 * self.Ts**2
+
         B[3, 0] = B[4, 1] = B[5, 2] = B[6, 3] = B[7, 4] = self.Ts
 
         return A, B

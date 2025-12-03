@@ -1,5 +1,5 @@
-# Fix permissions from host
-docker-compose exec --user root drone-control chown -R user:user /opt/px4_source
+# Fix permissions
+docker exec --user root drone_control_container chown -R user:user /PX4-Autopilot
 
-# Then re-enter the container
-docker-compose exec drone-control bash
+# Enter container
+docker exec -it drone_control_container bash
