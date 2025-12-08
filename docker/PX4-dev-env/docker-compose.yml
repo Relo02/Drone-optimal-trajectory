@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  px4-sim:
+    build:
+      context: ./PX4-sim
+      dockerfile: Dockerfile
+    image: px4-sim:latest
+    container_name: px4-sim-container
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./PX4-sim:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - $HOME/.Xauthority:/root/.Xauthority:rw
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - DISPLAY=${DISPLAY}
+    network_mode: host
+
+  ros2-humble:
+    build:
+      context: ./Ros2-humble
+      dockerfile: Dockerfile
+    image: ros2-humble-px4:latest
+    container_name: ros2-humble-container
+    tty: true
+    stdin_open: true
+    depends_on:
+      - px4-sim
+    volumes:
+      - ./Ros2-humble:/workspace
+    environment:
+      - DEBIAN_FRONTEND=noninteractive

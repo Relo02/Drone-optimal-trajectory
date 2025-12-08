@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 set -e
 
-cd ../..
-cd PX4-Autopilot
+cd /workspace/drone_ws/src/PX4-Autopilot
 
 echo "Starting PX4 SITL with gz_x500_depth..."
 echo "Command: make px4_sitl gz_x500_depth"
 
-# Navigate to PX4 directory if not already there
-if [ -d "PX4-Autopilot" ]; then
-    cd PX4-Autopilot
+# Initialize and update submodules
+echo "Initializing submodules..."
+git submodule update --init --recursive
+
+# Clean previous build
+echo "Cleaning previous build..."
+rm -rf build/
+
+# Source ROS and Gazebo environment
+if [ -f /opt/ros/humble/setup.bash ]; then
+    source /opt/ros/humble/setup.bash
 fi
 
-# Run SITL
-make px4_sitl gz_x500_depth
+# Run SITL with Gazebo x500
+echo "Building PX4 SITL with Gazebo x500..."
+make px4_sitl gz_x500_depth -j$(nproc)

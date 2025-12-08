@@ -176,6 +176,12 @@ cd scripts/
 ./start_uros_agent.sh
 ```
 
+Once you tried to run both px4 and gazebo but you got errors related to missing packages, install the following inside the container:
+
+```bash
+python3 -m pip install --user kconfiglib jinja2 jsonschema
+```
+
 After the whole system is up:
 
 - Verify PX4 console (`pxh>` prompt) is available.
