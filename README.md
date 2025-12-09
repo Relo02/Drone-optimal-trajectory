@@ -146,7 +146,7 @@ Ros2 works as a middleware for handling the trajectory planning and the simulate
 # Allow GUI forwarding (on host)
 xhost +
 
-cd /path/to/Drone-optimal-trajectory/docker
+cd /path/to/Drone-optimal-trajectory/docker/PX4-dev-env
 
 # Build and run the docker-compose service (named `drone-control`)
 docker-compose build drone-control
