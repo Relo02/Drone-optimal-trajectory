@@ -156,12 +156,18 @@ docker-compose up
 # In a new terminal run the px4 service for starting px4 and gazebo
 docker-compose run px4-sim bash
 
+# Launch px4 and gazebo in the walls.sdf world
+make px4_sitl gz_x500_depth_walls
+
 # Verify if the drone is capable to recive commands from the GCS
 # In the px4 terminal run the following command for arming the drone
 commander arm -f
 
 # Test if the drone is capable to initiate the takeoff service
 commander takeoff
+
+# In a new terminal, check if the depth camera topics are available in gazebo
+gz topic -l
 ```
 
 The last two commands that we runned in the px4 terminal will be handled by a state machine implemented in ros2.
