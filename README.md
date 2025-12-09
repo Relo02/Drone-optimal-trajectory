@@ -153,40 +153,19 @@ docker-compose build
 
 docker-compose up
 
-# In a new terminal run the container
-./run_container.sh
+# In a new terminal run the px4 service for starting px4 and gazebo
+docker-compose run px4-sim bash
+
+# Verify if the drone is capable to recive commands from the GCS
+# In the px4 terminal run the following command for arming the drone
+commander arm -f
+
+# Test if the drone is capable to initiate the takeoff service
+commander takeoff
 ```
 
-Inside the container you can use the helper scripts. Common useful scripts (located in `drone_control_ws/docker` or `/usr/local/bin/` inside the container):
+The last two commands that we runned in the px4 terminal will be handled by a state machine implemented in ros2.
 
-- `run_px4_sitl.sh` — launches PX4 SITL with the x500 Gazebo model
-- `start_uros_agent.sh` — starts Micro XRCE-DDS Agent for DDS communication protocol between px4 and ros2
-
-Once inside the container, run px4 and gazebo
-
-```bash
-# Source ROS2
-source /opt/ros/humble/setup.bash
-
-# Run px4 with gazebo
-cd scripts/
-./run_px4_sitl.sh
-
-# In a new terminal, run again the container and enable DDS protocol
-./start_uros_agent.sh
-```
-
-Once you tried to run both px4 and gazebo but you got errors related to missing packages, install the following inside the container:
-
-```bash
-python3 -m pip install --user kconfiglib jinja2 jsonschema
-```
-
-After the whole system is up:
-
-- Verify PX4 console (`pxh>` prompt) is available.
-
-  
 ---
 
 ## TODO steps
