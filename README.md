@@ -148,12 +148,12 @@ xhost +
 
 cd /path/to/Drone-optimal-trajectory/docker/PX4-dev-env
 
-# Build and run the docker-compose service (named `drone-control`)
-docker-compose build drone-control
+# Build and run the docker-compose service
+docker-compose build
 
-docker-compose up -d drone-control
+docker-compose up
 
-# Run the compose service
+# In a new terminal run the container
 ./run_container.sh
 ```
 
