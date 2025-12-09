@@ -166,6 +166,9 @@ commander arm -f
 # Test if the drone is capable to initiate the takeoff service
 commander takeoff
 
+# In a new terminal execute the running container
+docker-conpose exec px4-sim bash
+
 # In a new terminal, check if the depth camera topics are available in gazebo
 gz topic -l
 ```
