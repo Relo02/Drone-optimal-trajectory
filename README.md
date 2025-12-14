@@ -70,7 +70,7 @@ This example uses simple box constraints on each element of the stacked control 
 
 The QP formulation used by OSQP is:
 
-$$min \space{0.5 U^T H U + g^T U$$}
+$$min {0.5 U^T H U + g^T U$$}
 subject to $$l_b <= U <= u_b$$
 
 The code inserts these bounds as linear constraints via `A = I` in OSQP.
