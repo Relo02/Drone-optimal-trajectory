@@ -34,7 +34,7 @@ $$
 X = S_{x0} x_0 + S_u U
 $$
 
-where X = [x_1; x_2; ...; x_N] and U = [u_0; u_1; ...; u_{N-1}]. The implementation builds `Sx0` and `Su` in `model.build_prediction_matrices(A,B,N)`.
+where $$X = [x_1; x_2; ...; x_N]$$ and $$U = [u_0; u_1; ...; u_{N-1}]$$. The implementation builds `Sx0` and `Su` in `model.build_prediction_matrices(A,B,N)`.
 
 ### Cost function
 
