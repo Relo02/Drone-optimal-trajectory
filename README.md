@@ -15,8 +15,8 @@ Inside the trajectory optimization folder are available the one step ahead dynam
 
 The MPC in this code uses a reduced trajectory state vector (example, n=8):
 
-- States x_k = [x, y, z, vx, vy, vz, yaw, yaw_dot]^T
-- Inputs u_k = [a_x, a_y, a_z, yaw_ddot]^T
+- States $$x_k = [x, y, z, vx, vy, vz, yaw, yaw_dot]^T$$
+- Inputs $$u_k = [a_x, a_y, a_z, yaw_ddot]^T$$
 
 Note: `model.DroneModel.dynamics()` contains placeholders for building A and B matrices. The code uses these matrices as an LTI linearization of the true drone dynamics.
 
