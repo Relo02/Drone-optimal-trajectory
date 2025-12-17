@@ -200,6 +200,8 @@ After running the DDS protocol, re-run Px4-sitl and gazebo.
 Navigate to and check if the topic are visible after bridging the DDS topics
 ```bash
 cd /workspace
+source /opt/ros/humble/setup.bash
+source install/setup.bash
 ros2 topic list
 ```
 
