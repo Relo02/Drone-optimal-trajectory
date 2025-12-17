@@ -29,6 +29,21 @@ services:
     depends_on:
       - px4-sim
     volumes:
-      - ./Ros2-humble:/workspace
+      - /home/lorenzo/Drone-optimal-trajectory/drone_ws:/workspace
+      - ./Ros2-humble:/ros2_humble_setup
     environment:
       - DEBIAN_FRONTEND=noninteractive
+    network_mode: host
+
+  # ros2-ws:
+  #   build:
+  #     context: /home/lorenzo/Drone-optimal-trajectory/drone_ws
+  #     dockerfile: /home/lorenzo/Drone-optimal-trajectory/docker/PX4-dev-env/Ros2-humble/Dockerfile
+  #   image: ros2-ws-px4:latest
+  #   container_name: ros2-ws-container
+  #   tty: true
+  #   stdin_open: true
+  #   volumes:
+  #     - /home/lorenzo/Drone-optimal-trajectory/drone_ws:/workspace
+  #   environment:
+  #     - DEBIAN_FRONTEND=noninteractive

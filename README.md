@@ -177,6 +177,31 @@ The last two commands that we runned in the px4 terminal will be handled by a st
 
 ---
 
+### Running Micro DDS for ROS2 communication
+
+Note: before running the Micro DDS agent, shut down the previously running PX4 SITL and Gazebo simulation to free up the UDP port and to let Micro DDS bind to it.
+
+Micro-ROS uses Micro DDS as the default middleware for communication. To run Micro DDS in the Docker container, follow these steps:
+
+1. Open a new terminal window.
+2. Execute the following command to run Micro DDS:
+```bash
+docker-compose exec ros2-humble bash
+```
+3. Inside the container, run the Micro DDS command:
+```bash
+MicroXRCEAgent udp4 -p 8888
+```
+
+### Running Ros2 nodes for trable shooting if DDS connection is successful
+
+Navigate to and check if the topic are visible inside ros
+```bash
+cd /workspace
+ros2 topic list
+```
+
+
 ## TODO steps
 
 - Test with a simple mission commander if the drone is capable of reaching some desired goals in the ros2 environment
