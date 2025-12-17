@@ -193,9 +193,11 @@ docker-compose exec ros2-humble bash
 MicroXRCEAgent udp4 -p 8888
 ```
 
+After running the DDS protocol, re-run Px4-sitl and gazebo.
+
 ### Running Ros2 nodes for trable shooting if DDS connection is successful
 
-Navigate to and check if the topic are visible inside ros
+Navigate to and check if the topic are visible after bridging the DDS topics
 ```bash
 cd /workspace
 ros2 topic list
