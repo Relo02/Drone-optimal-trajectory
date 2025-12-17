@@ -184,7 +184,7 @@ Note: before running the Micro DDS agent, shut down the previously running PX4 S
 Micro-ROS uses Micro DDS as the default middleware for communication. To run Micro DDS in the Docker container, follow these steps:
 
 1. Open a new terminal window.
-2. Execute the following command to run Micro DDS:
+2. Execute the ros2 container:
 ```bash
 docker-compose exec ros2-humble bash
 ```
