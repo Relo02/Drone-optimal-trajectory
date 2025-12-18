@@ -31,8 +31,11 @@ services:
     volumes:
       - /home/lorenzo/Drone-optimal-trajectory/drone_ws:/workspace
       - ./Ros2-humble:/ros2_humble_setup
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - $HOME/.Xauthority:/root/.Xauthority:rw
     environment:
       - DEBIAN_FRONTEND=noninteractive
+      - DISPLAY=${DISPLAY}
     network_mode: host
 
   # ros2-ws:
