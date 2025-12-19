@@ -10,7 +10,10 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/start_mission_commander.launch.py'])
+        ('share/' + package_name + '/launch', ['launch/start_mission_commander.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/x500_state_publisher.launch.py']),
+        ('share/' + package_name + '/urdf', ['urdf/x500_depth.urdf']),
+        ('share/' + package_name + '/config', ['config/x500_depth_viz.rviz']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

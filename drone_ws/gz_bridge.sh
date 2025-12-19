@@ -1,6 +1,8 @@
-# Run this script inside the ros2-humble docker container
+# Run this script inside the ros2-humble docker container to expose Gazebo topics to ROS 2.
 cd /workspace
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image@ignition.msgs.Image /camera_info@sensor_msgs/msg/CameraInfo@ignition.msgs.CameraInfo /depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked /depth_camera@sensor_msgs/msg/Image@ignition.msgs.Image
+ros2 run ros_gz_bridge parameter_bridge \
+  /world/default/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan \
+  --ros-args -r /world/default/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan:=/scan
