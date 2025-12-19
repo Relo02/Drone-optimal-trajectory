@@ -177,6 +177,15 @@ The last two commands that we runned in the px4 terminal will be handled by a st
 
 ---
 
+### Run the default px4 SITL and Gazebo simulation world with the 2d lidar sensor
+
+```bash
+# In the px4 terminal run the following command for starting px4 and gazebo
+make px4_sitl gz_x500_lidar_2d
+```
+
+---
+
 ### Running Micro DDS for ROS2 communication
 
 Note: before running the Micro DDS agent, shut down the previously running PX4 SITL and Gazebo simulation to free up the UDP port and to let Micro DDS bind to it.
