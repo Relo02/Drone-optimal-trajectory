@@ -1,28 +1,42 @@
-import os
+#!/usr/bin/env python3
+# launch_laser_simple.py
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+from launch.actions import ExecuteProcess
+import os
 
 def generate_launch_description():
-    config_file = os.path.join(
-        get_package_share_directory('ros_gz_bridge'),
-        'config',
-        'default_laserscan.yaml'  # Check if this exists
-    )
+    # Get the absolute path to the config file
+    config_path = os.path.join(os.path.dirname(__file__), 'laser_view.rviz')
     
-    # If default doesn't exist, use our custom command
     return LaunchDescription([
+        # Laser bridge
         Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
+            package='drone',
+            executable='bridge',
             name='laser_bridge',
-            arguments=[
-                '/world/default/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan'
-                '@sensor_msgs/msg/LaserScan'
-                '[gz.msgs.LaserScan'
-            ],
             output='screen',
-            emulate_tty=True,
-            parameters=[{'lazy': False}]
-        )
+        ),
+        
+        # TF: map -> base_link
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='tf_map_base',
+            arguments=['0', '0', '0', '0', '0', '0', 'map', 'base_link'],
+        ),
+        
+        # TF: base_link -> link
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='tf_base_link',
+            arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'link'],
+        ),
+        
+        # RViz - simpler launch without complex parameters
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'rviz2', 'rviz2', '-d', config_path],
+            output='screen'
+        ),
     ])

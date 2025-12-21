@@ -31,6 +31,7 @@ setup(
             'bridge = drone.bridge:main',
             'mission_commander = drone.mission_commander:main',
             'simple_px4_commander = drone.simple_px4_commander:main',
+            'tf_drone_broadcaster = drone.tf_drone_broadcaster:main',
         ],
     },
 )

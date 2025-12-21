@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# laser_bridge_fixed.py
+# laser_bridge_final.py
 import importlib
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 import sys
-
+import time
 
 def _import_gz_module(candidates):
     for module_name in candidates:
@@ -17,13 +17,10 @@ def _import_gz_module(candidates):
         f"Unable to import Gazebo module; tried: {', '.join(candidates)}"
     )
 
-
-# Support versioned Gazebo Python bindings (e.g., gz.transport13, gz.msgs10).
 gz_transport = _import_gz_module(['gz.transport', 'gz.transport13', 'gz.transport14'])
 gz_laserscan_pb2 = _import_gz_module(
     ['gz.msgs.laserscan_pb2', 'gz.msgs10.laserscan_pb2', 'gz.msgs11.laserscan_pb2']
 )
-
 
 def _gz_subscribe(node, topic, msg_type, callback):
     module_name = getattr(gz_transport, '__name__', '')
@@ -34,12 +31,12 @@ def _gz_subscribe(node, topic, msg_type, callback):
     except (TypeError, AttributeError):
         return node.subscribe(topic, callback, msg_type)
 
-class FixedLaserBridge(Node):
+class LaserBridge(Node):
     def __init__(self):
-        super().__init__('fixed_laser_bridge')
+        super().__init__('laser_bridge')
         
         # Publisher for ROS 2
-        self.publisher = self.create_publisher(LaserScan, '/lidar/scan', 10)
+        self.publisher = self.create_publisher(LaserScan, '/scan', 10)
         
         # Initialize Gazebo transport
         self.gz_node = gz_transport.Node()
@@ -54,7 +51,7 @@ class FixedLaserBridge(Node):
         )
         
         self.get_logger().info(f'Subscribed to Gazebo topic: {topic_name}')
-        self.get_logger().info('Fixed laser bridge ready')
+        self.get_logger().info('Laser bridge ready')
     
     def gz_callback(self, gz_msg):
         try:
@@ -64,50 +61,42 @@ class FixedLaserBridge(Node):
             # Set timestamp
             ros_msg.header.stamp = self.get_clock().now().to_msg()
             
-            # Extract frame_id (try multiple sources)
-            frame_id = 'lidar_link'
-            if hasattr(gz_msg, 'frame') and gz_msg.frame:
-                frame_id = gz_msg.frame
-            elif hasattr(gz_msg, 'header') and hasattr(gz_msg.header, 'data'):
-                for data in gz_msg.header.data:
-                    if data.key == 'frame_id' and data.value:
-                        frame_id = data.value
-                        break
-            
+            # Use correct frame_id from Gazebo
+            frame_id = 'link'  # Hardcoded based on your Gazebo model
             ros_msg.header.frame_id = frame_id
             
-            # Map the basic fields (these exist in both)
-            ros_msg.angle_min = gz_msg.angle_min
-            ros_msg.angle_max = gz_msg.angle_max
-            ros_msg.range_min = gz_msg.range_min
-            ros_msg.range_max = gz_msg.range_max
+            # Map the basic fields
+            ros_msg.angle_min = float(gz_msg.angle_min)
+            ros_msg.angle_max = float(gz_msg.angle_max)
+            ros_msg.range_min = float(gz_msg.range_min)
+            ros_msg.range_max = float(gz_msg.range_max)
             
-            # Gazebo uses angle_step, ROS uses angle_increment
+            # Handle angle increment
             if hasattr(gz_msg, 'angle_step'):
-                ros_msg.angle_increment = gz_msg.angle_step
+                ros_msg.angle_increment = float(gz_msg.angle_step)
             else:
                 # Calculate from min/max and count
-                ros_msg.angle_increment = (gz_msg.angle_max - gz_msg.angle_min) / (len(gz_msg.ranges) - 1)
+                if hasattr(gz_msg, 'ranges') and len(gz_msg.ranges) > 1:
+                    ros_msg.angle_increment = (gz_msg.angle_max - gz_msg.angle_min) / (len(gz_msg.ranges) - 1)
             
             # Handle scan timing
-            if hasattr(gz_msg, 'count'):
-                # Assuming 10Hz scan rate
+            if hasattr(gz_msg, 'count') and gz_msg.count > 0:
                 scan_rate = 10.0  # Hz
                 ros_msg.scan_time = 1.0 / scan_rate
-                ros_msg.time_increment = ros_msg.scan_time / gz_msg.count
+                ros_msg.time_increment = ros_msg.scan_time / float(gz_msg.count)
             
             # Convert ranges
             ranges = []
             for r in gz_msg.ranges:
-                # Handle 'inf' values
-                if str(r).lower() == 'inf' or r > 1e6:  # Large number indicates inf
+                r_float = float(r)
+                if r_float >= gz_msg.range_max:
                     ranges.append(float('inf'))
                 else:
-                    ranges.append(float(r))
+                    ranges.append(r_float)
             
             ros_msg.ranges = ranges
             
-            # Handle intensities if available
+            # Handle intensities
             if hasattr(gz_msg, 'intensities') and gz_msg.intensities:
                 ros_msg.intensities = [float(i) for i in gz_msg.intensities]
             else:
@@ -116,19 +105,18 @@ class FixedLaserBridge(Node):
             # Publish the message
             self.publisher.publish(ros_msg)
             
-            # Log first successful message
+            # Log first message
             if not hasattr(self, 'first_msg_logged'):
                 self.get_logger().info(f'First message published: {len(ranges)} ranges')
-                self.get_logger().info(f'Frame: {frame_id}, Angle: [{gz_msg.angle_min:.3f}, {gz_msg.angle_max:.3f}] rad')
                 self.first_msg_logged = True
                 
         except Exception as e:
-            self.get_logger().error(f'Error in callback: {str(e)}', throttle_duration_sec=1)
+            self.get_logger().error(f'Error in callback: {str(e)}', throttle_duration_sec=5)
 
 def main():
     rclpy.init(args=sys.argv)
     
-    node = FixedLaserBridge()
+    node = LaserBridge()
     
     try:
         rclpy.spin(node)
