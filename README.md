@@ -214,6 +214,33 @@ source install/setup.bash
 ros2 topic list
 ```
 
+---
+
+### Running the odometry tf broadcaster
+The odometry topic provided by px4 it publishes the filtered data, through an EKF, between raw IMU measurements with or GPS (if available) or with the 2d LIDAR.
+In order to run the broadcaster, run the following node in a new container terminal:
+
+```bash
+cd /workspace/
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 run drone tf_drone_broadcaster
+```
+---
+
+### Launching rviz2 with the laser scan topic bridge
+In a new terminal, run the following:
+
+```bash
+cd /workspace/
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 launch drone laser_bridge.launch.py
+```
+
+---
 
 ## TODO steps
 
