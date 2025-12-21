@@ -1,0 +1,25 @@
+version: '3.8'
+
+x-px4-common: &px4-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: px4-full:latest
+  tty: true
+  stdin_open: true
+  network_mode: host
+  environment:
+    - DEBIAN_FRONTEND=noninteractive
+    - DISPLAY=${DISPLAY}
+    - PX4_SIM_MODEL=${PX4_SIM_MODEL:-gz_x500_lidar_2d}
+  volumes:
+    - /home/lorenzo/Drone-optimal-trajectory/drone_ws:/workspace
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - $HOME/.Xauthority:/root/.Xauthority:rw
+
+services:
+  px4-stack:
+    <<: *px4-common
+    container_name: px4-stack-container
+    working_dir: /PX4-Autopilot
+    command: bash -lc "source /opt/ros/humble/setup.bash && tail -f /dev/null"
