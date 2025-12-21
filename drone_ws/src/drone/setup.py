@@ -28,7 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'my_node = drone.my_node:main',
+            'bridge = drone.bridge:main',
             'mission_commander = drone.mission_commander:main',
             'simple_px4_commander = drone.simple_px4_commander:main',
         ],

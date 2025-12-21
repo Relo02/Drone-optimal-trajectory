@@ -1,11 +1,38 @@
 #!/usr/bin/env python3
 # laser_bridge_fixed.py
+import importlib
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-import gz.transport
-import gz.msgs.laserscan_pb2
 import sys
+
+
+def _import_gz_module(candidates):
+    for module_name in candidates:
+        try:
+            return importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            continue
+    raise ModuleNotFoundError(
+        f"Unable to import Gazebo module; tried: {', '.join(candidates)}"
+    )
+
+
+# Support versioned Gazebo Python bindings (e.g., gz.transport13, gz.msgs10).
+gz_transport = _import_gz_module(['gz.transport', 'gz.transport13', 'gz.transport14'])
+gz_laserscan_pb2 = _import_gz_module(
+    ['gz.msgs.laserscan_pb2', 'gz.msgs10.laserscan_pb2', 'gz.msgs11.laserscan_pb2']
+)
+
+
+def _gz_subscribe(node, topic, msg_type, callback):
+    module_name = getattr(gz_transport, '__name__', '')
+    if module_name.startswith('gz.transport') and module_name != 'gz.transport':
+        return node.subscribe(msg_type, topic, callback)
+    try:
+        return node.subscribe(msg_type, topic, callback)
+    except (TypeError, AttributeError):
+        return node.subscribe(topic, callback, msg_type)
 
 class FixedLaserBridge(Node):
     def __init__(self):
@@ -15,14 +42,15 @@ class FixedLaserBridge(Node):
         self.publisher = self.create_publisher(LaserScan, '/lidar/scan', 10)
         
         # Initialize Gazebo transport
-        self.gz_node = gz.transport.Node()
+        self.gz_node = gz_transport.Node()
         
         # Subscribe to Gazebo topic
         topic_name = '/world/default/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan'
-        self.gz_node.subscribe(
+        _gz_subscribe(
+            self.gz_node,
             topic_name,
+            gz_laserscan_pb2.LaserScan,
             self.gz_callback,
-            gz.msgs.laserscan_pb2.LaserScan
         )
         
         self.get_logger().info(f'Subscribed to Gazebo topic: {topic_name}')
