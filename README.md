@@ -137,114 +137,58 @@ What the demo does
 
 ## How to run the ROS2 simulation environment (quick guide)
 
-This project contains a separate, full ROS2 simulation environment. That environment packages PX4 SITL, Gazebo (gz) and helper launch scripts. Below are high-level steps to start the ROS2-based simulation used by the workspace.
-Ros2 works as a middleware for handling the trajectory planning and the simulated VO SLAM implemented inside the `trajectory_opt` folder.
-
-1) Use the provided Docker setup (recommended)
+This project contains a separate, full ROS2 simulation environment. It packages PX4 SITL, Gazebo (gz), and helper launch scripts. Below are high-level steps to start the ROS2-based simulation used by the workspace.
+ROS2 acts as middleware for trajectory planning.
 
 ```bash
-# Allow GUI forwarding (on host)
+# Allow GUI forwarding from containers (on host)
 xhost +
 
-cd /path/to/Drone-optimal-trajectory/docker/PX4-dev-env
+cd /path/to/Drone-optimal-trajectory/docker/PX4-dev-env/full_docker_setup
 
-# Build and run the docker-compose service
+# Build and start the docker-compose service
 docker-compose build
+docker-compose up -d
 
-docker-compose up
+# On the host (not in the container), open QGC in a new terminal
+cd /path/to/Drone-optimal-trajectory/QGC
+./QGroundControl-x86_64.AppImage
 
-# In a new terminal run the px4 service for starting px4 and gazebo
-docker-compose run px4-sim bash
+# Enter the px4 container in a new terminal
+docker-compose exec px4-stack bash
 
-# Launch px4 and gazebo in the walls.sdf world
-make px4_sitl gz_x500_depth_walls
+# Inside the container, start the 2D lidar drone simulation
+make px4_sitl gz_x500_lidar_2d_walls
 
-# Verify if the drone is capable to recive commands from the GCS
-# In the px4 terminal run the following command for arming the drone
-commander arm -f
-
-# Test if the drone is capable to initiate the takeoff service
-commander takeoff
-
-# In a new terminal execute the running container
-docker-conpose exec px4-sim bash
-
-# In a new terminal, check if the depth camera topics are available in gazebo
-gz topic -l
-```
-
-The last two commands that we runned in the px4 terminal will be handled by a state machine implemented in ros2.
-
----
-
-### Run the default px4 SITL and Gazebo simulation world with the 2d lidar sensor
-
-```bash
-# In the px4 terminal run the following command for starting px4 and gazebo
-make px4_sitl gz_x500_lidar_2d
-```
-
----
-
-### Running Micro DDS for ROS2 communication
-
-Note: before running the Micro DDS agent, shut down the previously running PX4 SITL and Gazebo simulation to free up the UDP port and to let Micro DDS bind to it.
-
-Micro-ROS uses Micro DDS as the default middleware for communication. To run Micro DDS in the Docker container, follow these steps:
-
-1. Open a new terminal window.
-2. Execute the ros2 container:
-```bash
-docker-compose exec ros2-humble bash
-```
-3. Inside the container, run the Micro DDS command:
-```bash
+# In another container terminal, run the micro-ROS agent
+cd /Micro-XRCE-DDS-Agent/build
 MicroXRCEAgent udp4 -p 8888
-```
 
-After running the DDS protocol, re-run Px4-sitl and gazebo.
-
-### Running Ros2 nodes for trable shooting if DDS connection is successful
-
-Navigate to and check if the topic are visible after bridging the DDS topics
-```bash
-cd /workspace
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 topic list
-```
-
----
-
-### Running the odometry tf broadcaster
-The odometry topic provided by px4 it publishes the filtered data, through an EKF, between raw IMU measurements with or GPS (if available) or with the 2d LIDAR.
-In order to run the broadcaster, run the following node in a new container terminal:
-
-```bash
+# In another container terminal, launch RViz2 with the laser scan bridge
 cd /workspace/
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-
-ros2 run drone tf_drone_broadcaster
-```
----
-
-### Launching rviz2 with the laser scan topic bridge
-In a new terminal, run the following:
-
-```bash
-cd /workspace/
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-
 ros2 launch drone laser_bridge.launch.py
+
+# In another container terminal, run the TF broadcaster for the odometry topic
+cd /workspace/
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run drone tf_drone_broadcaster
+
+# In another container terminal, run the trajectory planner node
+cd /workspace/
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run drone mission_commander
+
 ```
+
+The last two ROS2 nodes are currently started manually; they will be handled by a ROS2 state machine in the future.
 
 ---
 
 ## TODO steps
 
-- Test with a simple mission commander if the drone is capable of reaching some desired goals in the ros2 environment
-- Bridge necessary topics that are available in gazebo to ros2 (e.g. camera point cloud topic) and configure rviz2 for viewing the sensors topcis
 - Implement a state machine for checking at which state the drone is at along with the trajectory planner MPC implemented inside the `trajectory_opt` folder example.
-
+- Run the container with GPU support for enabling gazebo rendering.
