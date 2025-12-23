@@ -4,3 +4,4 @@ drone_ws/build/
 drone_ws/install/
 drone_ws/log/
 drone_ws/src/drone/scripts/PubSubTopics
+QGC/*.AppImage

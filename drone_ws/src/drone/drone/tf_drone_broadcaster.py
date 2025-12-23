@@ -55,7 +55,7 @@ class DroneTFBroadcaster(Node):
         self.drone_position = [
             float(position_frd[1]),   # y_frd -> x_enu (East)
             float(position_frd[0]),   # x_frd -> y_enu (North)
-            float(-position_frd[2])   # -z_frd -> z_enu (Up)
+            float(-position_frd[2])   # -z_frd -> z_enu (Up) (see if flipping z is needed)
         ]
         
         # Extract quaternion from PX4 odometry

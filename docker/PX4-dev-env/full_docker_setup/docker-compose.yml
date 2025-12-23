@@ -8,14 +8,18 @@ x-px4-common: &px4-common
   tty: true
   stdin_open: true
   network_mode: host
+  user: "${UID}:${GID}"
   environment:
     - DEBIAN_FRONTEND=noninteractive
     - DISPLAY=${DISPLAY}
+    - XAUTHORITY=/tmp/.Xauthority
     - PX4_SIM_MODEL=${PX4_SIM_MODEL:-gz_x500_lidar_2d}
   volumes:
     - /home/lorenzo/Drone-optimal-trajectory/drone_ws:/workspace
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    - $HOME/.Xauthority:/root/.Xauthority:rw
+    - $HOME/.Xauthority:/tmp/.Xauthority:rw
+    - /etc/passwd:/etc/passwd:ro
+    - /etc/group:/etc/group:ro
 
 services:
   px4-stack:
