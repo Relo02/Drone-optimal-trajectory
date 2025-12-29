@@ -2,9 +2,8 @@
 CasADi MPC with LiDAR-based obstacle avoidance constraints (safe halfspaces + slack)
 
 This example is intentionally "drop-in" as a template:
-- You preprocess LaserScan -> obstacle points z_i in WORLD frame (Nx3 numpy array)
-- You provide a reference predicted trajectory p_ref[k] in WORLD frame (N x 3),
-  typically from the previous MPC solution shifted forward (warm-start).
+- preprocess LaserScan -> obstacle points z_i in WORLD frame (Nx3 numpy array)
+- provide a reference predicted trajectory p_ref[k] in WORLD frame (N x 3).
 - We build linear halfspace constraints per horizon step:
       n^T p_k >= n^T z + r_s
   (with slack to avoid infeasibility)
