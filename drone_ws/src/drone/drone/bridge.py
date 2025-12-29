@@ -42,7 +42,7 @@ class LaserBridge(Node):
         self.gz_node = gz_transport.Node()
         
         # Subscribe to Gazebo topic
-        topic_name = '/world/walls/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan'
+        topic_name = '/world/default/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan'
         _gz_subscribe(
             self.gz_node,
             topic_name,

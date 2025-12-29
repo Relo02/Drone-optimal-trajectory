@@ -17,6 +17,14 @@ def generate_launch_description():
             name='laser_bridge',
             output='screen',
         ),
+
+        # TF broadcaster for the drone
+        Node(
+            package='drone',
+            executable='tf_drone_broadcaster',
+            name='tf_drone_broadcaster',
+            output='screen',
+        ),
         
         # TF: map -> base_link
         Node(

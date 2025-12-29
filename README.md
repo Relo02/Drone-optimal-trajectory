@@ -2,10 +2,17 @@
 
 This folder contains a simple Model Predictive Control (MPC) demonstration for a quadrotor-like drone. The implementation is a discrete-time, linear time-invariant (LTI) MPC that plans accelerations (and yaw acceleration) over a finite horizon and solves a quadratic program (QP) with OSQP at each control step.
 
+This repo also contains a ROS2 + PX4 SITL + Gazebo workflow with a CasADi MPC planner, a hover enable gate, and plotting utilities.
+
 ## Contents
 Inside the trajectory optimization folder are available the one step ahead dynamic model and the k-step ahead predictive model. In addition is also present the main code which runs the finite horizon MPC trajectory planner.  
 - `model.py` — DroneModel class: builds discrete dynamics (A,B), constructs prediction matrices (Sx0, Su), and assembles the QP matrices (H, g) for a terminal-goal cost.
 - `sim_main.py` — Simulation and closed-loop receding-horizon MPC example using OSQP. Plots and animates the planned trajectories and actual closed-loop motion.
+  
+- `drone_ws/src/drone/drone/mpc_obstalce_avoidance_node.py` — CasADi MPC planner with LiDAR obstacle half-space constraints.
+- `drone_ws/src/drone/drone/mpc_mission_commander.py` — Offboard commander that tracks the MPC trajectory.
+- `drone_ws/src/drone/drone/hover_enable_commander.py` — Hover gate that enables MPC once altitude is stable.
+- `drone_ws/scripts/plot_topics.py` / `drone_ws/scripts/plot_csv.py` — Plotters for rosbag and CSV data.
 
 ---
 
@@ -158,7 +165,9 @@ cd /path/to/Drone-optimal-trajectory/QGC
 docker-compose exec px4-stack bash
 
 # Inside the container, start the 2D lidar drone simulation
-make px4_sitl gz_x500_lidar_2d_walls
+make px4_sitl gz_x500_lidar_2d
+
+# after gazebo is launch, add some obstacles in the world for testing in a simpler environment setting
 
 # In another container terminal, run the micro-ROS agent
 cd /Micro-XRCE-DDS-Agent/build
@@ -170,25 +179,34 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch drone laser_bridge.launch.py
 
-# In another container terminal, run the TF broadcaster for the odometry topic
+# In another container terminal, run the MPC planner + hover gate + commander
 cd /workspace/
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 run drone tf_drone_broadcaster
-
-# In another container terminal, run the trajectory planner node
-cd /workspace/
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run drone mission_commander
+ros2 launch drone path_planning.launch.py
 
 ```
 
-The last two ROS2 nodes are currently started manually; they will be handled by a ROS2 state machine in the future.
+Note: Once you launch the laser_bridge, you should set on Rviz2 the fixed frame to `world` and enable the `LaserScan` display subscribing to the `/scan` topic to visualize the LiDAR data.
 
----
+The `path_planning.launch.py` launch file starts:
+- `hover_enable_commander` (arms, holds hover, then publishes `/mpc/enable`)
+- `mpc_obstacle_avoidance` (waits for enable, then optimizes)
+- `mpc_mission_commander` (waits for enable, then tracks the MPC path)
 
-## TODO steps
+## Plotting results (rosbag + CSV)
 
-- Implement a state machine for checking at which state the drone is at along with the trajectory planner MPC implemented inside the `trajectory_opt` folder example.
-- Run the container with GPU support for enabling gazebo rendering.
+To generate the csv files from rosbag data, run the following script:
+
+```bash
+cd /workspace/scripts
+./plot_topics.py  --backend csv ./workspace/scripts/plot_data
+```
+
+To plot from CSV data:
+
+```bash
+cd /workspace/scripts
+./plot_csv.py --dir ./workspace/scripts/plot_data
+```
+

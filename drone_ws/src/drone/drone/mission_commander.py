@@ -8,6 +8,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+from nav_msgs.msg import Path
 
 from px4_msgs.msg import (
     TrajectorySetpoint,
@@ -41,25 +42,44 @@ class MissionCommander(Node):
         self.ack_sub = self.create_subscription(
             VehicleCommandAck, '/fmu/out/vehicle_command_ack', self.ack_cb, qos)
 
-        # Coverage area (NED frame: x=North, y=East, z=Down)
-        self.area_length_m = 10.0
-        self.area_width_m = 6.0
-        self.lane_spacing_m = 2.0
-        self.altitude_m = 2.0
-        self.home_setpoint = [0.0, 0.0, -self.altitude_m, 0.0]
-        self.waypoints = self.build_coverage_waypoints()
+        self.path_sub = self.create_subscription(
+            Path,
+            '/mpc/optimal_trajectory',
+            self.path_callback,
+            qos,
+        )
 
         self.idx = 0
         self.current_pos = [0.0, 0.0, 0.0]
+        self.current_odom_enu = [0.0, 0.0, 0.0]
         self.armed = False
         self.offboard = False
         self.preflight_ok = False
         self.safety_off = False
         self.failsafe = False
+        self.hover_reached = False
         self.last_status_log = 0.0
+        self.current_yaw = 0.0
+        self.lookahead_idx = 3
+        self.mission_complete = False
+
+        # Coverage area (ENU frame: x=East, y=North, z=Up)
+        # Hover the drone at 3 meters altitude before starting navigating
+        self.hover_setpoint = [0.0, 0.0, 3.0, 0.0]  # x, y, z, yaw
+        self.waypoints = []
+        self.latest_path = []
+        self.waypoints_ready = False
+
+        # if self.hover_reached:
+        #     self.get_logger().info('Hover setpoint reached, building waypoints...')
+        #     self.waypoints = self.build_coverage_waypoints()
+        #     self.waypoints_ready = True
+        # else:
+        #     self.get_logger().info('Waiting to reach hover setpoint before building waypoints...')
 
         # Start publishing immediately (PX4 requires a steady stream of setpoints)
-        self.publish_timer = self.create_timer(0.02, self.publish_setpoints)  # 50 Hz
+        self.publish_timer = self.create_timer(1.0, self.publish_setpoints)  # 50 Hz
+        self.hover_timer = self.create_timer(1.0, self.check_hover_reached)
 
         # Sequencing timers
         self.arm_timer = self.create_timer(2.0, self.arm_sequence)
@@ -69,52 +89,81 @@ class MissionCommander(Node):
         self.get_logger().info('=== MISSION COMMANDER ===')
         self.get_logger().info('Publishing setpoints and waiting to arm...')
 
-    def build_coverage_waypoints(self):
-        """Create a lawnmower-style rectangle coverage pattern."""
-        length = float(self.area_length_m)
-        width = float(self.area_width_m)
-        spacing = float(self.lane_spacing_m)
-        altitude = -float(self.altitude_m)
-
-        points = [(0.0, 0.0)]
-        y = 0.0
-        direction = 1
-
-        while True:
-            target_x = length if direction == 1 else 0.0
-            if points[-1] != (target_x, y):
-                points.append((target_x, y))
-
-            y_next = y + spacing
-            if y_next > width + 1e-6:
-                break
-
-            points.append((target_x, y_next))
-            y = y_next
-            direction *= -1
-
-        if points[-1] != (0.0, 0.0):
-            points.append((0.0, 0.0))
-
-        waypoints = []
-        for i, (x, y) in enumerate(points):
-            if i + 1 < len(points):
-                next_x, next_y = points[i + 1]
-                yaw = math.atan2(next_y - y, next_x - x)
-            elif i > 0:
-                prev_x, prev_y = points[i - 1]
-                yaw = math.atan2(y - prev_y, x - prev_x)
-            else:
-                yaw = 0.0
-            waypoints.append([x, y, altitude, yaw])
-
-        return waypoints
-
     def odom_cb(self, msg):
+        pos_ned = [msg.position[0], msg.position[1], msg.position[2]]
+        self.current_odom_enu = self.ned_to_enu_position(pos_ned)
+
+    def check_hover_reached(self):
+        """Check if the drone has reached the hover setpoint."""
+        dx = self.current_odom_enu[0] - self.hover_setpoint[0]
+        dy = self.current_odom_enu[1] - self.hover_setpoint[1]
+        dz = self.current_odom_enu[2] - self.hover_setpoint[2]
+        dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+        if dist < 0.5:
+            self.get_logger().info('Hover setpoint reached.')
+            self.hover_reached = True
+            if (not self.waypoints_ready) and self.latest_path:
+                self.get_logger().info('Building waypoints from latest path...')
+                self.waypoints = self.latest_path
+                self.waypoints_ready = True
+                self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints from path.')
+        else:
+            self.get_logger().info('Waiting to reach hover setpoint...')
+            self.hover_reached = False
+
+    def build_coverage_waypoints(self):
+        """Get the waypoints from the Path planning mpc."""
+        # Get the path from the latest Path message received
+        if self.latest_path:
+            return self.latest_path
+
+        waypoints = self.current_pos.copy()
+        waypoints.append(self.current_yaw)
+        return [waypoints]
+
+    def enu_to_ned_position(self, pos_enu):
+        """Convert ROS ENU (x=East, y=North, z=Up) to PX4 NED (x=North, y=East, z=Down)."""
+        return [pos_enu[1], pos_enu[0], -pos_enu[2]]
+
+    def enu_to_ned_yaw(self, yaw_enu):
+        """Convert ENU yaw (about +Z Up) to NED yaw (about +Z Down)."""
+        yaw_ned = (math.pi / 2.0) - yaw_enu
+        return math.atan2(math.sin(yaw_ned), math.cos(yaw_ned))
+
+    def ned_to_enu_position(self, pos_ned):
+        """Convert PX4 NED (x=North, y=East, z=Down) to ROS ENU (x=East, y=North, z=Up)."""
+        return [pos_ned[1], pos_ned[0], -pos_ned[2]]
+
+    def path_callback(self, msg):
         try:
-            self.current_pos = [msg.position[0], msg.position[1], msg.position[2]]
-        except Exception:
-            pass
+            if not msg.poses:
+                return
+
+            waypoints = []
+            for pose_stamped in msg.poses:
+                pose = pose_stamped.pose
+                pos = [pose.position.x, pose.position.y, pose.position.z]
+                q = pose.orientation
+                yaw = math.atan2(
+                    2.0 * (q.w * q.z + q.x * q.y),
+                    1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+                )
+                waypoints.append([pos[0], pos[1], pos[2], yaw])
+
+            self.latest_path = waypoints
+            first = waypoints[0]
+            self.current_pos = [first[0], first[1], first[2]]
+            self.current_yaw = first[3]
+            self.get_logger().info(f'Path update - {len(waypoints)} poses, first: {first}')
+
+            if self.hover_reached:
+                self.waypoints = self.latest_path
+                if not self.waypoints_ready:
+                    self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints from path.')
+                self.waypoints_ready = True
+        except Exception as exc:
+            self.get_logger().warn(f'Path parsing failed: {exc}')
 
     def status_cb(self, msg):
         old_armed = self.armed
@@ -137,6 +186,7 @@ class MissionCommander(Node):
                 self.get_logger().info('OFFBOARD mode enabled')
                 self.get_logger().info('Starting mission...')
                 self.idx = 0
+                self.mission_complete = False
             else:
                 self.get_logger().warn('Left OFFBOARD mode')
 
@@ -162,6 +212,14 @@ class MissionCommander(Node):
             f'ACK {cmd_name}: {result_text} (reason={msg.result_param1})')
 
     def publish_setpoints(self):
+        """Publish position setpoints in ENU frame."""
+        if self.hover_reached:
+            self.get_logger().info('Hover setpoint reached, building waypoints...')
+            self.waypoints = self.build_coverage_waypoints()
+            self.waypoints_ready = True
+        else:
+            self.get_logger().info('Waiting to reach hover setpoint before building waypoints...')
+
         offboard_msg = OffboardControlMode()
         offboard_msg.timestamp = int(time.time() * 1e6)
         offboard_msg.position = True
@@ -170,17 +228,16 @@ class MissionCommander(Node):
         traj_msg = TrajectorySetpoint()
         traj_msg.timestamp = int(time.time() * 1e6)
 
-        if self.offboard and self.idx < len(self.waypoints):
-            wp = self.waypoints[self.idx]
-            traj_msg.position = [float(wp[0]), float(wp[1]), float(wp[2])]
-            traj_msg.yaw = float(wp[3])
+        if self.offboard and self.waypoints:
+            wp_index = min(self.lookahead_idx, len(self.waypoints) - 1)
+            wp = self.waypoints[wp_index]
+            pos_ned = self.enu_to_ned_position([wp[0], wp[1], wp[2]])
+            traj_msg.position = [float(pos_ned[0]), float(pos_ned[1]), float(pos_ned[2])]
+            traj_msg.yaw = float(self.enu_to_ned_yaw(wp[3]))
         else:
-            traj_msg.position = [
-                self.home_setpoint[0],
-                self.home_setpoint[1],
-                self.home_setpoint[2],
-            ]
-            traj_msg.yaw = self.home_setpoint[3]
+            pos_ned = self.enu_to_ned_position(self.hover_setpoint[:3])
+            traj_msg.position = [float(pos_ned[0]), float(pos_ned[1]), float(pos_ned[2])]
+            traj_msg.yaw = float(self.enu_to_ned_yaw(self.hover_setpoint[3]))
 
         self.traj_pub.publish(traj_msg)
 
@@ -227,23 +284,18 @@ class MissionCommander(Node):
         if not self.armed or not self.offboard:
             return
 
-        if self.idx >= len(self.waypoints):
+        if not self.waypoints:
             return
 
-        wp = self.waypoints[self.idx]
-        dx = self.current_pos[0] - wp[0]
-        dy = self.current_pos[1] - wp[1]
-        dz = self.current_pos[2] - wp[2]
+        wp = self.waypoints[-1]
+        dx = self.current_odom_enu[0] - wp[0]
+        dy = self.current_odom_enu[1] - wp[1]
+        dz = self.current_odom_enu[2] - wp[2]
         dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 
-        if dist < 0.6:
-            self.get_logger().info(f'Reached waypoint {self.idx}: {wp}')
-            self.idx += 1
-            if self.idx < len(self.waypoints):
-                next_wp = self.waypoints[self.idx]
-                self.get_logger().info(f'Next waypoint {self.idx}: {next_wp}')
-            else:
-                self.get_logger().info('Mission complete')
+        if dist < 0.6 and not self.mission_complete:
+            self.get_logger().info('Mission complete')
+            self.mission_complete = True
 
 
 def main(args=None):
