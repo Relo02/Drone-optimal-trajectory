@@ -60,16 +60,7 @@ where $z_i$ are obstacle points, $n_i$ is the unit normal pointing from the obst
 
 $$
 J = \sum_{k=0}^{N-1} \Big(
-Q_p^{ref} \lVert p_k - p_k^{ref} \rVert^2
- + Q_p^{goal} \lVert p_k - p_{goal} \rVert^2
- + Q_\psi \lVert \psi_k - \psi_k^{ref} \rVert^2
- + Q_v \lVert v_k \rVert^2
- + Q_r \lVert r_k \rVert^2
- + R_a \lVert a_k \rVert^2
- + R_{\dot{r}} \lVert \dot{r}_k \rVert^2
- + \rho \lVert s_k \rVert^2
-\Big)
- + J_{terminal}
+Q_p^{ref} \lVert p_k - p_k^{ref} \rVert^2 + Q_p^{goal} \lVert p_k - p_{goal} \rVert^2 + Q_\psi \lVert \psi_k - \psi_k^{ref} \rVert^2 + Q_v \lVert v_k \rVert^2 + Q_r \lVert r_k \rVert^2 + R_a \lVert a_k \rVert^2 + R_{\dot{r}} \lVert \dot{r}_k \rVert^2 + \rho \lVert s_k \rVert^2 \Big) + J_{terminal}
 $$
 
 The terminal cost applies additional weight to the final position and yaw error.
