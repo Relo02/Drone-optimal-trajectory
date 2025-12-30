@@ -200,7 +200,7 @@ To generate the csv files from rosbag data, run the following script:
 
 ```bash
 cd /workspace/scripts
-./plot_topics.py  --backend csv ./workspace/scripts/plot_data
+./plot_topics.py  --backend csv --out ./workspace/scripts/plot_data
 ```
 
 To plot from CSV data:
