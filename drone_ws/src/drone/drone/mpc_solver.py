@@ -149,7 +149,7 @@ def mpc_solve(
 
     # === TUNED WEIGHTS ===
     Qp_ref = 100.0     # Track reference trajectory
-    Qp_goal = 80.0    # Pull toward goal
+    Qp_goal = 150.0    # Pull toward goal
     Qyaw = 0.5        # Yaw tracking
     Qv = 0.5          # Velocity penalty
     Qyaw_rate = 0.3
@@ -190,8 +190,9 @@ def mpc_solve(
         p_ref_k = p_ref_cas[k, :].T
         
         # Progressive goal weight
-        alpha = (k + 1) / N
-        Qp_goal_k = Qp_goal * alpha
+        # alpha = (k + 1) / N
+        # Qp_goal_k = Qp_goal * alpha
+        Qp_goal_k = Qp_goal
         
         yaw_err = yawk - yaw_ref_k
         
@@ -208,8 +209,8 @@ def mpc_solve(
 
         # === Z ALTITUDE CONSTRAINT (CRITICAL) ===
         g.append(pk[2])
-        lbg += [0.0]
-        ubg += [5.0]
+        lbg += [z_min]
+        ubg += [z_max]
 
         # Obstacle avoidance
         A_k, b_k = halfspaces[k]
@@ -244,7 +245,7 @@ def mpc_solve(
     w = [ca.reshape(X, -1, 1), ca.reshape(U, -1, 1)]
     for s in S_list:
         w.append(ca.reshape(s, -1, 1))
-    w = ca.vertcat(*w)
+    w = ca.vertcat(*w) # Final decision variable vector
 
     # === VARIABLE BOUNDS (lbx, ubx) - THE FIX ===
     lbx = []

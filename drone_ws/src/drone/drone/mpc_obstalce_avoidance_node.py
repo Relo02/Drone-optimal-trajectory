@@ -206,7 +206,7 @@ class MPCObstacleAvoidanceNode(Node):
         self.R0 = _NED_TO_ENU @ R_frd_to_ned @ _FLU_TO_FRD
 
         _, _, yaw_ned = _euler_from_quaternion(qx, qy, qz, qw)
-        self.yaw0 = (math.pi / 2.0) - yaw_ned
+        self.yaw0 = (math.pi / 2.0) - yaw_ned # Convert NED yaw to ENU yaw
 
         try:
             self.yaw_dot0 = -float(msg.angular_velocity[2])
@@ -362,7 +362,7 @@ class MPCObstacleAvoidanceNode(Node):
             return p_ref, yaw_ref
 
         direction_unit = direction / dist_to_goal
-        v_desired = 1.5
+        v_desired = 1.5 # m/s, constant desired speed
         v_vec = direction_unit * v_desired
 
         p_ref = np.zeros((self.N, 3))

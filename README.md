@@ -1,144 +1,88 @@
 # Drone-optimal-trajectory
 
-This folder contains a simple Model Predictive Control (MPC) demonstration for a quadrotor-like drone. The implementation is a discrete-time, linear time-invariant (LTI) MPC that plans accelerations (and yaw acceleration) over a finite horizon and solves a quadratic program (QP) with OSQP at each control step.
-
-This repo also contains a ROS2 + PX4 SITL + Gazebo workflow with a CasADi MPC planner, a hover enable gate, and plotting utilities.
+This repository contains a ROS2 + PX4 SITL + Gazebo stack for a quadrotor MPC with LiDAR-based obstacle avoidance. The MPC runs inside ROS2, consumes PX4 odometry and LaserScan data, and outputs acceleration and yaw commands.
 
 ## Contents
-Inside the trajectory optimization folder are available the one step ahead dynamic model and the k-step ahead predictive model. In addition is also present the main code which runs the finite horizon MPC trajectory planner.  
-- `model.py` — DroneModel class: builds discrete dynamics (A,B), constructs prediction matrices (Sx0, Su), and assembles the QP matrices (H, g) for a terminal-goal cost.
-- `sim_main.py` — Simulation and closed-loop receding-horizon MPC example using OSQP. Plots and animates the planned trajectories and actual closed-loop motion.
-  
-- `drone_ws/src/drone/drone/mpc_obstalce_avoidance_node.py` — CasADi MPC planner with LiDAR obstacle half-space constraints.
-- `drone_ws/src/drone/drone/mpc_mission_commander.py` — Offboard commander that tracks the MPC trajectory.
-- `drone_ws/src/drone/drone/hover_enable_commander.py` — Hover gate that enables MPC once altitude is stable.
-- `drone_ws/scripts/plot_topics.py` / `drone_ws/scripts/plot_csv.py` — Plotters for rosbag and CSV data.
+- `drone_ws/src/drone/drone/mpc_obstalce_avoidance_node.py` - ROS2 node that builds the reference trajectory, converts frames, and runs the MPC loop.
+- `drone_ws/src/drone/drone/mpc_solver.py` - CasADi MPC formulation with dynamics, costs, and half-space obstacle constraints.
+- `drone_ws/src/drone/drone/mpc_mission_commander.py` - Offboard commander that tracks the MPC trajectory.
+- `drone_ws/src/drone/drone/hover_enable_commander.py` - Hover gate that enables MPC once altitude is stable.
+- `drone_ws/scripts/plot_topics.py` and `drone_ws/scripts/plot_csv.py` - Plotters for rosbag and CSV data.
 
 ---
 
-## MPC overview (implementation details)
+## MPC overview (current ROS2 implementation)
 
-### State and input definition
-
-The MPC in this code uses a reduced trajectory state vector (example, n=8):
-
-- States $$x_k = [x, y, z, v_x, v_y, v_z, \psi, \dot{\psi}]^T$$
-- Inputs $$u_k = [a_x, a_y, a_z, \ddot{\psi}]^T$$
-
-Note: `model.DroneModel.dynamics()` contains placeholders for building A and B matrices. The code uses these matrices as an LTI linearization of the true drone dynamics.
-
-### Discrete-time LTI dynamics
-
-The discrete-time dynamics are assumed in the standard form:
+### State and input
+The solver in `mpc_solver.py` uses:
 
 $$
-x_{k+1} = A x_k + B u_k
+x_k = [p_x, p_y, p_z, \psi, v_x, v_y, v_z, r]^T
+$$
+$$
+u_k = [a_x, a_y, a_z, \dot{r}]^T
 $$
 
-Prediction matrices are built for a horizon of length $N$ producing stacked forms:
+with yaw rate $r = \dot{\psi}$.
+
+### Discrete-time dynamics
 
 $$
-X = S_{x0} x_0 + S_u U
+p_{k+1} = p_k + \Delta t \, v_k
+$$
+$$
+\psi_{k+1} = \psi_k + \Delta t \, r_k
+$$
+$$
+v_{k+1} = v_k + \Delta t \, a_k
+$$
+$$
+r_{k+1} = r_k + \Delta t \, \dot{r}_k
 $$
 
-where $$X = [x_1; x_2; ...; x_N]$$ and $$U = [u_0; u_1; ...; u_{N-1}]$$. The implementation builds `Sx0` and `Su` in `model.build_prediction_matrices(A,B,N)`.
+### Reference generation
+`mpc_obstalce_avoidance_node.py` builds a reference trajectory in ENU by:
+- Reusing the previous MPC solution if it is still close to the current state.
+- Otherwise, generating a straight-line segment to the current goal at a constant desired speed.
+
+Yaw reference is aligned with the line from the current position to the goal.
+
+### Obstacle half-spaces
+For each step, the solver builds half-space constraints from LiDAR points:
+
+$$
+n_i^T p_k \ge n_i^T z_i + r_s - s_{i,k}
+$$
+
+where $z_i$ are obstacle points, $n_i$ is the unit normal pointing from the obstacle to the reference position, $r_s$ is the safety radius, and $s_{i,k} \ge 0$ are slack variables. Only the nearest points (up to `m_planes`) within a range are used to build the half-spaces.
 
 ### Cost function
 
-The MPC minimizes a quadratic terminal-goal cost of the form:
+$$
+J = \sum_{k=0}^{N-1} \Big(
+Q_p^{ref} \lVert p_k - p_k^{ref} \rVert^2
+ + Q_p^{goal} \lVert p_k - p_{goal} \rVert^2
+ + Q_\psi \lVert \psi_k - \psi_k^{ref} \rVert^2
+ + Q_v \lVert v_k \rVert^2
+ + Q_r \lVert r_k \rVert^2
+ + R_a \lVert a_k \rVert^2
+ + R_{\dot{r}} \lVert \dot{r}_k \rVert^2
+ + \rho \lVert s_k \rVert^2
+\Big)
+ + J_{terminal}
+$$
 
-$$
-J(U) = \tfrac{1}{2} U^T H U + g^T U
-$$
-
-where
-
-$$
-H = S_u^T Q_{bar} S_u + R_{bar}
-$$
-$$
-g = S_u^T Q_{bar} (S_{x0} x_0 - X_{ref})
-$$
-
-Details in the code:
-- `Q_stage` — per-stage state cost (applied to each stage except last)
-- `Qf` — terminal state cost (heavy weight on terminal position)
-- `R` — input (control) cost
-- `Qbar` and `Rbar` — block-diagonal expanded costs across the horizon
-
-In `model.build_qp_in_u_terminal_goal(Q,R,Qf,Sx0,Su,x0,x_goal)` the reference is encoded only at the terminal stage (X_ref has x_goal at the final block).
+The terminal cost applies additional weight to the final position and yaw error.
 
 ### Constraints
+- Dynamics equality constraints for each step.
+- Altitude bounds: $z_{min} \le z_k \le z_{max}$ (including terminal).
+- Velocity and yaw rate bounds.
+- Acceleration and yaw acceleration bounds.
+- Obstacle half-space constraints with non-negative slack.
 
-This example uses simple box constraints on each element of the stacked control vector U. In `sim_main.py`:
-
-- `a_max` — maximum absolute acceleration (m/s^2)
-- lower/upper bound vectors `lb`, `ub` created via Kronecker product to apply the same bound at every horizon step.
-
-The QP formulation used by OSQP is:
-
-$$min {0.5 U^T H U + g^T U}$$
-subject to $$l_b \leq U \leq u_b$$
-
-The code inserts these bounds as linear constraints via `A = I` in OSQP.
-
-### Solver and implementation notes
-
-- The QP is solved with OSQP (sparse QP solver). The code prepares a symmetric (numerically PSD) Hessian `P = (H+H^T)/2 + eps*I` before converting to sparse CSC. A tiny `eps` regularizer ensures numerical stability.
-- Warm-starting: the solver is warm-started with the shifted previous solution (useful to speed up convergence).
-- The code attempts to only update the linear term `q` each iteration and falls back to updating the Hessian if necessary.
-
-### Typical parameters (from `sim_main.py`)
-
-- time-step dt = 0.05 s
-- horizon N = 30
-- state dimension n = 8 (example)
-- input dimension m = 4 (example)
-- Q_stage: small weights on position/velocity in each stage
-- Qf: very large terminal weights on final position (to enforce terminal goal)
-- R: moderate penalty on control effort (0.5 * I)
-
----
-
-## How to run the local MPC demo (trajectory_opt)
-
-Prerequisites
-
-- Python 3.8+ (code was tested with Python 3.12 in a venv in this workspace)
-- Install required packages (numpy, scipy, matplotlib, osqp)
-
-Create a virtual environment and install requirements (example):
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install numpy scipy matplotlib osqp
-```
-
-Run the simulation
-
-```bash
-cd trajectory_opt
-python3 sim_main.py
-```
-
-What the demo does
-
-- Builds prediction matrices using the provided A,B in `model.py`.
-- Constructs the QP (H,g) for a given initial state and terminal goal.
-- Sets up OSQP with simple box constraints on inputs and solves the QP in a receding-horizon loop.
-- Applies the first control input, simulates the next state with the discrete-time model, and repeats.
-- Produces plots showing the final planned input sequence and the actual trajectory; also shows a 3D animation comparing the actual path with the current plan at each step.
-
----
-
-## Suggested extensions / improvements
-
-- Add state constraints (e.g., position or velocity limits) and model them as linear constraints in OSQP.
-- Include disturbance handling or a soft-constraint terminal set (MPC with constraint tightening).
-- Add obstacle avoidance constraints coming from the VO SLAM.
-- Add logging and unit tests for `build_prediction_matrices` and `build_qp_in_u_terminal_goal`.
+### Solver
+The MPC is solved with CasADi + IPOPT. Decision variables are bounded explicitly (state, input, and slack), and a warm start is initialized from the reference trajectory.
 
 ---
 
@@ -209,4 +153,3 @@ To plot from CSV data:
 cd /workspace/scripts
 ./plot_csv.py --dir ./workspace/scripts/plot_data
 ```
-
