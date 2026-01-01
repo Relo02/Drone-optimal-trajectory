@@ -135,12 +135,12 @@ To generate the csv files from rosbag data, run the following script:
 
 ```bash
 cd /workspace/scripts
-./plot_topics.py  --backend csv --out ./workspace/scripts/plot_data
+./plot_topics.py  --backend csv --out ./plot_data
 ```
 
 To plot from CSV data:
 
 ```bash
 cd /workspace/scripts
-./plot_csv.py --dir ./workspace/scripts/plot_data
+./plot_csv.py --dir ./plot_data
 ```
