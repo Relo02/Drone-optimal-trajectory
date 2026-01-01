@@ -153,7 +153,7 @@ def mpc_solve(
     Qyaw = 0.5        # Yaw tracking
     Qv = 0.5          # Velocity penalty
     Qyaw_rate = 0.3
-    Ru = 0.1          # Control effort
+    Ru = 0.01          # Control effort
     Rr = 0.1
     rho_slack = 2000.0  # Slack penalty
 
@@ -247,21 +247,37 @@ def mpc_solve(
         w.append(ca.reshape(s, -1, 1))
     w = ca.vertcat(*w) # Final decision variable vector
 
-    # === VARIABLE BOUNDS (lbx, ubx) - THE FIX ===
+    # === VARIABLE BOUNDS (lbx, ubx) - NOTE: CasADi uses column-major flattening ===
     lbx = []
     ubx = []
-    
-    # State bounds: [px, py, pz, yaw, vx, vy, vz, yaw_dot]
-    for k in range(N + 1):
-        lbx += [-ca.inf, -ca.inf, z_min, -ca.inf]  # position + yaw
-        ubx += [ca.inf, ca.inf, z_max, ca.inf]
-        lbx += [-v_max, -v_max, -v_max, -yaw_rate_max]  # velocities
-        ubx += [v_max, v_max, v_max, yaw_rate_max]
-    
-    # Control bounds: [ax, ay, az, yaw_ddot]
-    for k in range(N):
-        lbx += [-u_max, -u_max, -u_max, -yaw_accel_max]
-        ubx += [u_max, u_max, u_max, yaw_accel_max]
+
+    # State bounds by component (match column-major stacking of X)
+    lbx += [-ca.inf] * (N + 1)  # px
+    ubx += [ca.inf] * (N + 1)
+    lbx += [-ca.inf] * (N + 1)  # py
+    ubx += [ca.inf] * (N + 1)
+    lbx += [z_min] * (N + 1)  # pz
+    ubx += [z_max] * (N + 1)
+    lbx += [-ca.inf] * (N + 1)  # yaw
+    ubx += [ca.inf] * (N + 1)
+    lbx += [-v_max] * (N + 1)  # vx
+    ubx += [v_max] * (N + 1)
+    lbx += [-v_max] * (N + 1)  # vy
+    ubx += [v_max] * (N + 1)
+    lbx += [-v_max] * (N + 1)  # vz
+    ubx += [v_max] * (N + 1)
+    lbx += [-yaw_rate_max] * (N + 1)  # yaw_dot
+    ubx += [yaw_rate_max] * (N + 1)
+
+    # Control bounds by component (match column-major stacking of U)
+    lbx += [-u_max] * N  # ax
+    ubx += [u_max] * N
+    lbx += [-u_max] * N  # ay
+    ubx += [u_max] * N
+    lbx += [-u_max] * N  # az
+    ubx += [u_max] * N
+    lbx += [-yaw_accel_max] * N  # yaw_ddot
+    ubx += [yaw_accel_max] * N
     
     # Slack bounds (non-negative)
     for k in range(N):
