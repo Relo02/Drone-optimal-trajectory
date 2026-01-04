@@ -91,9 +91,7 @@ where:
 - **Alignment** (0 to 1): How well the gap center points toward the goal direction
   $$\text{alignment} = \frac{\pi - |\theta_{gap} - \theta_{goal}|}{\pi}$$
 - **Quality**: Combined measure of gap width and depth
-  ```math
-      \text{quality} = \frac{\text{gap_width}}{\pi} \cdot \frac{\text{min_range}}{\text{max\_obs\_range}}
-   ```   
+  $$\text{quality} = \frac{\text{gap\_width}}{\pi} \cdot \frac{\text{min\_range}}{\text{max\_obs\_range}}$$      
 - $w_{align}$ is `gap_alignment_weight` (default 0.85, strongly preferring goal direction)
 
 Additional scoring modifiers:
