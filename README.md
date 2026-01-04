@@ -91,7 +91,7 @@ where:
 - **Alignment** (0 to 1): How well the gap center points toward the goal direction
   $$\text{alignment} = \frac{\pi - |\theta_{gap} - \theta_{goal}|}{\pi}$$
 - **Quality**: Combined measure of gap width and depth
-  $$\text{quality} = \frac{\text{gap\_width}}{\pi} \cdot \frac{\text{min\_range}}{\text{max\_obs\_range}}$$
+  $$\text{quality} = \frac{w_{gap}}{\pi} \cdot \frac{r_{min}}{r_{max}}$$
 - $w_{align}$ is `gap_alignment_weight` (default 0.85, strongly preferring goal direction)
 
 Additional scoring modifiers:
@@ -107,7 +107,7 @@ $$
 p_{intermediate} = p_{drone} + d \cdot \hat{n}_{gap}
 $$
 
-where $d = \min(\text{gap\_goal\_distance}, 0.8 \cdot \text{min\_range}, \text{dist\_to\_goal})$ and $\hat{n}_{gap}$ is the unit direction toward the gap center in world frame.
+where $d = \min(d_{gap}, 0.8 \cdot r_{min}, d_{goal})$ and $\hat{n}_{gap}$ is the unit direction toward the gap center in world frame. Here $d_{gap}$ is `gap_goal_distance`, $r_{min}$ is the minimum range in the gap, and $d_{goal}$ is the distance to goal.
 
 #### Stability mechanisms
 
