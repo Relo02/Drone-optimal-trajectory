@@ -56,6 +56,77 @@ $$
 
 where $z_i$ are obstacle points, $n_i$ is the unit normal pointing from the obstacle to the reference position, $r_s$ is the safety radius, and $s_{i,k} \ge 0$ are slack variables. Only the nearest points (up to `m_planes`) within a range are used to build the half-spaces.
 
+### Gap-based navigation
+
+The MPC uses a two-layer approach for obstacle avoidance. While the half-space constraints handle low-level collision avoidance, a **gap-based navigation** layer provides high-level path planning through cluttered environments. This is essential for handling non-convex obstacle configurations (e.g., a cylinder blocking the direct path where the drone must choose to go left or right).
+
+#### Gap detection algorithm
+
+The gap detection analyzes the LiDAR scan to find free corridors:
+
+1. **Identify free directions**: A scan ray is marked as "free" if:
+   - Range exceeds 90% of `max_obs_range` (no obstacle detected)
+   - Range is invalid/infinite (clear path)
+   - Range is below minimum threshold (sensor noise)
+
+2. **Group consecutive free rays into gaps**: The algorithm sweeps through the scan and groups consecutive free directions. Each gap is characterized by:
+   - Start/end angles (angular extent)
+   - Center angle (middle direction)
+   - Minimum range (depth of the gap)
+   - Angular width
+
+3. **Filter by minimum width**: Gaps narrower than `gap_min_width` (default 1.0m at max range) are discarded.
+
+4. **Handle wrap-around**: If a gap spans the scan boundaries (e.g., -π to +π), the algorithm merges the first and last gaps.
+
+#### Gap selection and scoring
+
+When the direct path to the goal is blocked, the algorithm scores each gap:
+
+$$
+\text{score} = w_{align} \cdot \text{alignment} + (1 - w_{align}) \cdot \text{quality}
+$$
+
+where:
+- **Alignment** (0 to 1): How well the gap center points toward the goal direction
+  $$\text{alignment} = \frac{\pi - |\theta_{gap} - \theta_{goal}|}{\pi}$$
+- **Quality**: Combined measure of gap width and depth
+  $$\text{quality} = \frac{\text{gap\_width}}{\pi} \cdot \frac{\text{min\_range}}{\text{max\_obs\_range}}$$
+- $w_{align}$ is `gap_alignment_weight` (default 0.85, strongly preferring goal direction)
+
+Additional scoring modifiers:
+- Gaps >90° off goal direction: 80% penalty
+- Gaps >60° off goal direction: 50% penalty  
+- Gaps <30° off goal direction: 30% bonus
+
+#### Intermediate goal placement
+
+Once the best gap is selected, an intermediate goal is placed through it:
+
+$$
+p_{intermediate} = p_{drone} + d \cdot \hat{n}_{gap}
+$$
+
+where $d = \min(\text{gap\_goal\_distance}, 0.8 \cdot \text{min\_range}, \text{dist\_to\_goal})$ and $\hat{n}_{gap}$ is the unit direction toward the gap center in world frame.
+
+#### Stability mechanisms
+
+To prevent oscillation between gaps:
+- **Hysteresis**: The intermediate goal only changes if the new position differs by more than `gap_hysteresis` (default 1.0m)
+- **Spin detection**: If the drone is rotating fast (>0.3 rad/s) but moving slow (<0.5 m/s), the intermediate goal is locked
+- **Direct path check**: A cone of ±17° around the goal direction is checked; if clear beyond `direct_path_threshold`, gap navigation is bypassed
+
+#### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `gap_nav_enabled` | `true` | Enable/disable gap-based navigation |
+| `gap_min_width` | `1.0` | Minimum gap width in meters |
+| `gap_goal_distance` | `3.0` | Distance to place intermediate goal |
+| `gap_alignment_weight` | `0.85` | Weight for goal alignment vs gap quality |
+| `direct_path_threshold` | `3.0` | Min clear distance to use direct path |
+| `gap_hysteresis` | `1.0` | Min change in goal to switch gaps |
+
 ### Cost function
 
 $$

@@ -19,13 +19,20 @@ def build_halfspaces_for_step(
     p_ref: np.ndarray,
     obstacles_world: np.ndarray,
     r_s: float,
-    m_planes: int = 8,
+    m_planes: int = 12,
     max_range: float = 6.0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Build M halfspace constraints for a single step"""
+    """Build M halfspace constraints for a single step.
+    
+    Uses a hybrid approach:
+    1. Select closest obstacles for immediate collision avoidance
+    2. Use angular binning to ensure coverage around the drone
+    3. Prioritize obstacles in the direction of motion
+    """
     if obstacles_world.size == 0:
         return np.zeros((0, 3)), np.zeros((0,))
 
+    # Filter obstacles within range
     d = np.linalg.norm(obstacles_world - p_ref[None, :], axis=1)
     mask = d <= max_range
     cand = obstacles_world[mask]
@@ -33,8 +40,43 @@ def build_halfspaces_for_step(
         return np.zeros((0, 3)), np.zeros((0,))
 
     d_c = np.linalg.norm(cand - p_ref[None, :], axis=1)
-    idx = np.argsort(d_c)[: min(m_planes, cand.shape[0])]
-    pts = cand[idx]
+    
+    # Strategy: Use angular sectors to ensure coverage
+    # Divide the horizontal plane into sectors and pick closest obstacle per sector
+    n_sectors = min(m_planes, 8)  # At least 8 angular sectors
+    n_closest = m_planes - n_sectors  # Remaining slots for closest obstacles
+    
+    selected_indices = set()
+    
+    # 1. Angular sector selection for coverage
+    rel_pos = cand[:, :2] - p_ref[:2]  # Relative position in XY plane
+    angles = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
+    
+    sector_size = 2 * np.pi / n_sectors
+    for sector in range(n_sectors):
+        sector_min = -np.pi + sector * sector_size
+        sector_max = sector_min + sector_size
+        
+        # Find obstacles in this sector
+        in_sector = (angles >= sector_min) & (angles < sector_max)
+        sector_indices = np.where(in_sector)[0]
+        
+        if len(sector_indices) > 0:
+            # Pick the closest obstacle in this sector
+            sector_dists = d_c[sector_indices]
+            closest_in_sector = sector_indices[np.argmin(sector_dists)]
+            selected_indices.add(closest_in_sector)
+    
+    # 2. Add n_closest absolutely closest obstacles (may overlap with sectors)
+    closest_indices = np.argsort(d_c)[:n_closest + len(selected_indices)]
+    for idx in closest_indices:
+        if len(selected_indices) >= m_planes:
+            break
+        selected_indices.add(idx)
+    
+    # Convert to list and get points
+    selected_indices = list(selected_indices)[:m_planes]
+    pts = cand[selected_indices]
 
     A_rows = []
     b_rows = []
@@ -148,14 +190,14 @@ def mpc_solve(
     J = 0
 
     # === TUNED WEIGHTS ===
-    Qp_ref = 100.0     # Track reference trajectory
-    Qp_goal = 150.0    # Pull toward goal
-    Qyaw = 0.5        # Yaw tracking
-    Qv = 0.5          # Velocity penalty
+    Qp_ref = 80.0      # Track reference trajectory (reduced to allow deviation for obstacles)
+    Qp_goal = 120.0    # Pull toward goal
+    Qyaw = 0.5         # Yaw tracking
+    Qv = 0.5           # Velocity penalty
     Qyaw_rate = 0.3
     Ru = 0.01          # Control effort
     Rr = 0.1
-    rho_slack = 2000.0  # Slack penalty
+    rho_slack = 5000.0 # Slack penalty (increased for stronger obstacle avoidance)
 
     # === HARD LIMITS ===
     u_max = 2.5       # Max acceleration (reduced from 3.0)
@@ -295,9 +337,10 @@ def mpc_solve(
         {
             "ipopt.print_level": 0,
             "print_time": 0,
-            "ipopt.max_iter": 80,
-            "ipopt.tol": 1e-3,
-            "ipopt.acceptable_tol": 1e-2,
+            "ipopt.max_iter": 100,
+            "ipopt.tol": 1e-4,
+            "ipopt.acceptable_tol": 1e-3,
+            "ipopt.warm_start_init_point": "yes",
         },
     )
 

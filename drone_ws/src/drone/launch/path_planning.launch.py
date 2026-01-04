@@ -12,6 +12,8 @@ def generate_launch_description():
         parameters=[
             {'require_mpc_enable': True},
             {'enable_topic': '/mpc/enable'},
+            {'use_global_path': True},
+            {'global_path_topic': '/plan'},
         ],
     )
 

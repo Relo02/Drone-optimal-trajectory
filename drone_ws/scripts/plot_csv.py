@@ -62,30 +62,45 @@ def main():
     ax_pos = fig.add_subplot(2, 2, 3)
     ax_vel = fig.add_subplot(2, 2, 4)
 
-    if ref_all:
-        ax_traj.scatter(
-            [p[0] for p in ref_all],
-            [p[1] for p in ref_all],
-            s=4,
-            alpha=0.3,
-            label="ref all",
+    # Plot actual flown path from position data (the real drone trajectory)
+    if pos_rows:
+        ax_traj.plot(
+            [p[1] for p in pos_rows],  # E (East)
+            [p[2] for p in pos_rows],  # N (North)
+            'k-',
+            linewidth=2,
+            label="actual path",
         )
-    if opt_all:
-        ax_traj.scatter(
-            [p[0] for p in opt_all],
-            [p[1] for p in opt_all],
-            s=4,
-            alpha=0.3,
-            label="opt all",
-        )
+    
+    # Plot only the LAST reference and optimal trajectories (not all MPC iterations)
     if ref_last:
-        ax_traj.plot([p[0] for p in ref_last], [p[1] for p in ref_last], label="ref last")
+        ax_traj.plot(
+            [p[0] for p in ref_last], 
+            [p[1] for p in ref_last], 
+            'b--',
+            linewidth=1.5,
+            label="ref (last)",
+        )
     if opt_last:
-        ax_traj.plot([p[0] for p in opt_last], [p[1] for p in opt_last], label="opt last")
-    ax_traj.set_title("Trajectories (E-N)")
+        ax_traj.plot(
+            [p[0] for p in opt_last], 
+            [p[1] for p in opt_last], 
+            'r-',
+            linewidth=1.5,
+            label="predicted (last)",
+        )
+    
+    # Mark start and end points
+    if pos_rows:
+        ax_traj.plot(pos_rows[0][1], pos_rows[0][2], 'go', markersize=10, label="start")
+        ax_traj.plot(pos_rows[-1][1], pos_rows[-1][2], 'r*', markersize=12, label="end")
+    
+    ax_traj.set_title("Trajectory (E-N)")
     ax_traj.set_xlabel("E [m]")
     ax_traj.set_ylabel("N [m]")
     ax_traj.legend(loc="best")
+    ax_traj.axis("equal")
+    ax_traj.grid(True, alpha=0.3)
 
     if cost_rows:
         ax_cost.plot([r[0] for r in cost_rows], [r[1] for r in cost_rows], color="#2ca02c")

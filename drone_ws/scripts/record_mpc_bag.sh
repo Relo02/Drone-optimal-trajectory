@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-out_dir="${1:-mpc_bag}"
+out_dir="${1:-mpc_bag_0}"
 if [ $# -gt 0 ]; then
   shift
 fi

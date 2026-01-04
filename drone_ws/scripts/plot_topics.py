@@ -307,8 +307,8 @@ def main():
     parser = argparse.ArgumentParser(description="Plot MPC bag topics.")
     parser.add_argument(
         "--bag",
-        default=os.path.join(os.path.dirname(__file__), "mpc_bag"),
-        help="Path to rosbag2 directory (default: drone_ws/scripts/mpc_bag)",
+        default=os.path.join(os.path.dirname(__file__), "mpc_bag_0"),
+        help="Path to rosbag2 directory (default: drone_ws/scripts/mpc_bag_0)",
     )
     parser.add_argument(
         "--out",
