@@ -124,7 +124,7 @@ class MPCObstacleAvoidanceNode(Node):
         
         # Gap-based navigation parameters
         self.gap_nav_enabled = bool(
-            self.declare_parameter("gap_nav_enabled", True).value
+            self.declare_parameter("gap_nav_enabled", False).value
         )
         self.gap_min_width = float(
             self.declare_parameter("gap_min_width", 1.0).value  # Minimum gap width in meters

@@ -1,17 +1,244 @@
 # Drone-optimal-trajectory
 
-This repository contains a ROS2 + PX4 SITL + Gazebo stack for a quadrotor MPC with LiDAR-based obstacle avoidance. The MPC runs inside ROS2, consumes PX4 odometry and LaserScan data, and outputs acceleration and yaw commands.
+This repository contains a ROS2 + PX4 SITL + Gazebo stack for a quadrotor MPC with LiDAR-based obstacle avoidance. The MPC runs inside ROS2, consumes PX4 odometry and LaserScan data, and outputs trajectory setpoints with velocity feedforward.
 
 ## Contents
-- `drone_ws/src/drone/drone/mpc_obstalce_avoidance_node.py` - ROS2 node that builds the reference trajectory, converts frames, and runs the MPC loop.
-- `drone_ws/src/drone/drone/mpc_solver.py` - CasADi MPC formulation with dynamics, costs, and half-space obstacle constraints.
-- `drone_ws/src/drone/drone/mpc_mission_commander.py` - Offboard commander that tracks the MPC trajectory.
-- `drone_ws/src/drone/drone/hover_enable_commander.py` - Hover gate that enables MPC once altitude is stable.
-- `drone_ws/scripts/plot_topics.py` and `drone_ws/scripts/plot_csv.py` - Plotters for rosbag and CSV data.
+
+### MPC v2 (Recommended)
+- `drone_ws/src/drone/drone/mpc_core.py` - Clean CasADi MPC solver with obstacle-aware reference trajectory
+- `drone_ws/src/drone/drone/mpc_obstacle_avoidance_node_v2.py` - ROS2 node with direct PX4 control and velocity feedforward
+- `drone_ws/src/drone/drone/mpc_visualizer.py` - Real-time 3D visualization tool
+- `drone_ws/src/drone/launch/mpc_obstacle_avoidance_v2.launch.py` - Standalone launch file (no separate commander needed)
+
+### Legacy MPC v1
+- `drone_ws/src/drone/drone/mpc_obstalce_avoidance_node.py` - Original ROS2 node (requires separate commander)
+- `drone_ws/src/drone/drone/mpc_solver.py` - Original CasADi MPC formulation
+- `drone_ws/src/drone/drone/mpc_mission_commander.py` - Offboard commander that tracks MPC trajectory
+- `drone_ws/src/drone/drone/hover_enable_commander.py` - Hover gate that enables MPC once altitude is stable
+
+### Utilities
+- `drone_ws/scripts/plot_topics.py` and `drone_ws/scripts/plot_csv.py` - Plotters for rosbag and CSV data
 
 ---
 
-## MPC overview (current ROS2 implementation)
+## MPC v2 Overview (Recommended)
+
+The MPC v2 is a complete rewrite addressing issues found in v1. Key improvements:
+
+| Feature | v1 | v2 |
+|---------|----|----|
+| PX4 Control | Via separate commander node | **Direct TrajectorySetpoint** |
+| Velocity | Position-only commands | **Velocity feedforward** |
+| Obstacle Constraints | Half-space constraints (can fail) | **Distance-based soft constraints** |
+| Reference Trajectory | Straight line (goes through walls) | **Potential field obstacle-aware** |
+| Architecture | Multiple nodes | **Single self-contained node** |
+| Speed | Slow (~0.1 m/s) | **Fast (~2-3 m/s)** |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    mpc_obstacle_avoidance_node_v2               │
+│                                                                 │
+│  ┌───────────────┐    ┌───────────────┐    ┌────────────────┐  │
+│  │ LidarProcessor │───▶│  GapNavigator │───▶│   MPCSolver    │  │
+│  │  (clustering)  │    │ (path planning)│    │ (optimization) │  │
+│  └───────────────┘    └───────────────┘    └────────────────┘  │
+│          │                    │                     │           │
+│          ▼                    ▼                     ▼           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Direct PX4 Control Interface               │   │
+│  │  • TrajectorySetpoint (position + velocity + yaw)       │   │
+│  │  • OffboardControlMode (at 10Hz)                        │   │
+│  │  • VehicleCommand (arm, offboard mode)                  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+            │                                      ▲
+            │ /fmu/in/trajectory_setpoint          │ /fmu/out/vehicle_odometry
+            ▼                                      │
+┌─────────────────────────────────────────────────────────────────┐
+│                           PX4 SITL                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### State and Input
+
+The MPC uses an 8-state double-integrator model:
+
+$$
+x_k = [p_x, p_y, p_z, \psi, v_x, v_y, v_z, \dot{\psi}]^T
+$$
+
+$$
+u_k = [a_x, a_y, a_z, \ddot{\psi}]^T
+$$
+
+### Discrete-Time Dynamics
+
+$$
+p_{k+1} = p_k + \Delta t \cdot v_k + \frac{\Delta t^2}{2} \cdot a_k
+$$
+
+$$
+v_{k+1} = v_k + \Delta t \cdot a_k
+$$
+
+$$
+\psi_{k+1} = \psi_k + \Delta t \cdot \dot{\psi}_k
+$$
+
+$$
+\dot{\psi}_{k+1} = \dot{\psi}_k + \Delta t \cdot \ddot{\psi}_k
+$$
+
+### Obstacle-Aware Reference Trajectory
+
+Unlike v1's straight-line reference (which goes through walls), v2 uses a **potential field** approach to generate obstacle-aware references:
+
+$$
+p^{ref}_{k+1} = p^{ref}_k + \Delta t \cdot v_{desired} \cdot \hat{d}_{attractive} + \sum_i F_{repulsive,i}
+$$
+
+Where:
+- $\hat{d}_{attractive}$ = unit vector toward goal
+- $F_{repulsive,i}$ = repulsive force from obstacle $i$:
+
+$$
+F_{repulsive,i} = \begin{cases}
+\eta \cdot \left(\frac{1}{d_i} - \frac{1}{d_0}\right) \cdot \frac{1}{d_i^2} \cdot \hat{n}_i & \text{if } d_i < d_0 \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+Where $d_0$ is the influence distance and $\eta$ is the repulsion gain.
+
+### Cost Function
+
+$$
+J = \sum_{k=0}^{N-1} \Big[
+Q_p \lVert p_k - p_k^{ref} \rVert^2 + 
+Q_g \lVert p_k - p_{goal} \rVert^2 + 
+Q_v \lVert v_k \rVert^2 + 
+Q_\psi (\psi_k - \psi_k^{ref})^2 +
+R_a \lVert a_k \rVert^2 + 
+R_{\ddot{\psi}} \ddot{\psi}_k^2 +
+\rho \sum_j s_{j,k}^2
+\Big] + J_{terminal}
+$$
+
+### Distance-Based Obstacle Constraints (Soft)
+
+Instead of half-space constraints, v2 uses **distance-based soft constraints**:
+
+$$
+d_{ij} - r_s + s_{ij} \geq 0, \quad s_{ij} \geq 0
+$$
+
+Where:
+- $d_{ij}$ = Euclidean distance from predicted position $p_k$ to obstacle $j$
+- $r_s$ = safety radius (default 1.2m)
+- $s_{ij}$ = slack variable (penalized heavily in cost)
+
+This formulation:
+- Never causes infeasibility (slack allows violation with high cost)
+- Works in all directions (not just normal direction)
+- Handles moving closer to obstacles gracefully
+
+### Velocity Feedforward to PX4
+
+The key to fast response is **velocity feedforward**. The TrajectorySetpoint includes both position and velocity:
+
+```python
+traj_msg.position = [x, y, z]      # Where to go
+traj_msg.velocity = [vx, vy, vz]  # How fast to go (from MPC!)
+traj_msg.yaw = yaw
+traj_msg.yawspeed = yaw_rate
+```
+
+This tells PX4's controller the intended velocity, so it doesn't have to "guess" and ramp up slowly.
+
+### Gap-Based Navigation (Optional)
+
+For complex environments like narrow corridors, v2 includes optional gap-based navigation (same algorithm as v1). Enable with:
+
+```bash
+ros2 launch drone mpc_obstacle_avoidance_v2.launch.py gap_navigation_enabled:=true
+```
+
+### MPC v2 Parameters
+
+#### Core MPC Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `dt` | `0.1` | Time step [s] |
+| `horizon` | `20` | Prediction horizon steps |
+| `safety_radius` | `1.2` | Min distance from obstacles [m] |
+| `emergency_radius` | `0.6` | Emergency brake distance [m] |
+| `max_velocity` | `3.0` | Max velocity [m/s] |
+| `max_acceleration` | `4.0` | Max acceleration [m/s²] |
+| `max_yaw_rate` | `1.5` | Max yaw rate [rad/s] |
+
+#### Cost Weight Parameters (Speed Tuning)
+
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `Q_pos` | `50.0` | Position tracking (higher = follows reference tighter) |
+| `Q_vel` | `0.5` | Velocity penalty (lower = faster) |
+| `R_acc` | `0.05` | Acceleration penalty (lower = more aggressive) |
+| `Q_terminal` | `200.0` | Terminal cost (higher = reaches goal more precisely) |
+
+#### PX4 Control Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `direct_px4_control` | `true` | Send commands directly to PX4 |
+| `velocity_feedforward` | `true` | Include velocity in setpoint |
+| `lookahead_index` | `5` | Trajectory index for position setpoint |
+| `auto_arm` | `true` | Automatically arm and switch to offboard |
+
+### Running MPC v2
+
+```bash
+# Build
+cd ~/Drone-optimal-trajectory/drone_ws
+colcon build --packages-select drone
+source install/setup.bash
+
+# Run (single command - no separate commander needed!)
+ros2 launch drone mpc_obstacle_avoidance_v2.launch.py goal:='[10.0, 10.0, 1.5]'
+
+# With custom parameters
+ros2 launch drone mpc_obstacle_avoidance_v2.launch.py \
+    goal:='[10.0, 10.0, 1.5]' \
+    max_velocity:=4.0 \
+    safety_radius:=1.5 \
+    R_acc:=0.02
+
+# Run 3D visualizer (in separate terminal)
+ros2 run drone mpc_visualizer
+```
+
+### Tuning Guide
+
+**Drone too slow?**
+- Decrease `R_acc` (e.g., 0.02)
+- Decrease `Q_vel` (e.g., 0.1)
+- Increase `max_velocity` (e.g., 4.0)
+- Increase `max_acceleration` (e.g., 5.0)
+
+**Drone hits obstacles?**
+- Increase `safety_radius` (e.g., 1.5)
+- Increase `emergency_radius` (e.g., 0.8)
+- Decrease `max_velocity` (e.g., 2.0)
+
+**Drone oscillates near obstacles?**
+- Increase `Q_pos` for tighter reference tracking
+- Enable gap navigation for complex environments
+
+---
+
+## MPC v1 Overview (Legacy)
 
 ### State and input
 The solver in `mpc_solver.py` uses:
@@ -148,10 +375,16 @@ The MPC is solved with CasADi + IPOPT. Decision variables are bounded explicitly
 
 ---
 
-## How to run the ROS2 simulation environment (quick guide)
+## How to Run
 
-This project contains a separate, full ROS2 simulation environment. It packages PX4 SITL, Gazebo (gz), and helper launch scripts. Below are high-level steps to start the ROS2-based simulation used by the workspace.
-ROS2 acts as middleware for trajectory planning.
+### Prerequisites
+
+1. Docker environment set up (see docker/ directory)
+2. PX4 SITL + Gazebo running
+3. Micro-XRCE-DDS-Agent running
+4. ROS2 Humble workspace built
+
+### Quick Start (MPC v2 - Recommended)
 
 ```bash
 # Allow GUI forwarding from containers (on host)
@@ -170,10 +403,11 @@ cd /path/to/Drone-optimal-trajectory/QGC
 # Enter the px4 container in a new terminal
 docker-compose exec px4-stack bash
 
-# Inside the container, start the 2D lidar drone simulation
-make px4_sitl gz_x500_lidar_2d
+# Inside the container, start the 2D lidar drone simulation with walls
+make px4_sitl gz_x500_lidar_2d_walls
 
-# after gazebo is launch, add some obstacles in the world for testing in a simpler environment setting
+# (or for simple environment without obstacles)
+make px4_sitl gz_x500_lidar_2d
 
 # In another container terminal, run the micro-ROS agent
 cd /Micro-XRCE-DDS-Agent/build
@@ -185,22 +419,44 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch drone laser_bridge.launch.py
 
-# In another container terminal, run the MPC planner + hover gate + commander
+# In another container terminal, run MPC v2 (RECOMMENDED)
+cd /workspace/
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch drone mpc_obstacle_avoidance_v2.launch.py goal:='[10.0, 10.0, 1.5]'
+
+# (Optional) In another terminal, run the 3D visualizer
+ros2 run drone mpc_visualizer
+```
+
+### Running MPC v1 (Legacy)
+
+If you need to use the legacy MPC v1 system:
+
+```bash
+# In a container terminal, run the MPC v1 planner + hover gate + commander
 cd /workspace/
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch drone path_planning.launch.py
-
 ```
-
-Note: Once you launch the laser_bridge, you should set on Rviz2 the fixed frame to `world` and enable the `LaserScan` display subscribing to the `/scan` topic to visualize the LiDAR data.
 
 The `path_planning.launch.py` launch file starts:
 - `hover_enable_commander` (arms, holds hover, then publishes `/mpc/enable`)
 - `mpc_obstacle_avoidance` (waits for enable, then optimizes)
 - `mpc_mission_commander` (waits for enable, then tracks the MPC path)
 
-## Plotting results (rosbag + CSV)
+### RViz2 Setup
+
+Once you launch the laser_bridge:
+1. Set the fixed frame to `world`
+2. Add `LaserScan` display subscribing to `/scan`
+3. Add `Path` displays for `/mpc/predicted_path` and `/mpc/reference_path`
+4. Add `PoseStamped` for `/mpc/active_goal` and `/mpc/final_goal`
+
+---
+
+## Plotting Results (rosbag + CSV)
 
 To generate the csv files from rosbag data, run the following script:
 
@@ -215,3 +471,27 @@ To plot from CSV data:
 cd /workspace/scripts
 ./plot_csv.py --dir ./plot_data
 ```
+
+---
+
+## Troubleshooting
+
+### Drone moves too slowly
+- Decrease `R_acc` parameter (e.g., `R_acc:=0.02`)
+- Ensure `velocity_feedforward:=true` is set
+- Increase `max_velocity` (e.g., `max_velocity:=4.0`)
+
+### Drone hits obstacles
+- Increase `safety_radius` (e.g., `safety_radius:=1.5`)
+- Decrease `max_velocity` for more reaction time
+- Check that LiDAR is publishing on `/scan`
+
+### MPC solver fails
+- Check obstacle count in logs (should be <30 after clustering)
+- Increase `max_obstacle_range` if needed
+- Check for invalid odometry data
+
+### Drone doesn't arm
+- Ensure QGroundControl is connected
+- Check that `auto_arm:=true` is set
+- Verify offboard control mode messages are being sent

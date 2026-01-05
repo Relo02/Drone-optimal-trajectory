@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/laser_bridge.launch.py']),
         ('share/' + package_name + '/launch', ['launch/path_planning.launch.py']),
         ('share/' + package_name + '/launch', ['launch/x500_state_publisher.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/mpc_obstacle_avoidance_v2.launch.py']),
         ('share/' + package_name + '/urdf', ['urdf/x500_depth.urdf']),
         ('share/' + package_name + '/config', ['config/x500_depth_viz.rviz']),
     ],
@@ -36,6 +37,8 @@ setup(
             'simple_px4_commander = drone.simple_px4_commander:main',
             'tf_drone_broadcaster = drone.tf_drone_broadcaster:main',
             'mpc_obstacle_avoidance = drone.mpc_obstalce_avoidance_node:main',
+            'mpc_obstacle_avoidance_v2 = drone.mpc_obstacle_avoidance_node_v2:main',
+            'mpc_visualizer = drone.mpc_visualizer:main',
         ],
     },
 )

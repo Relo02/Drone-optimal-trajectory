@@ -202,8 +202,8 @@ def mpc_solve(
     # === HARD LIMITS ===
     u_max = 2.5       # Max acceleration (reduced from 3.0)
     v_max = 2.0       # Max velocity (reduced from 2.5)
-    yaw_rate_max = 1.5  # Reduced
-    yaw_accel_max = 2.0  # Reduced
+    yaw_rate_max = 0.5  # Reduced
+    yaw_accel_max = 1.0  # Reduced
     z_min = 0.0       # Min altitude
     z_max = 5.0      # Max altitude
 
