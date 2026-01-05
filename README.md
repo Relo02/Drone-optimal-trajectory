@@ -36,29 +36,46 @@ The MPC v2 is a complete rewrite addressing issues found in v1. Key improvements
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    mpc_obstacle_avoidance_node_v2               │
-│                                                                 │
-│  ┌───────────────┐    ┌───────────────┐    ┌────────────────┐  │
-│  │ LidarProcessor │───▶│  GapNavigator │───▶│   MPCSolver    │  │
-│  │  (clustering)  │    │ (path planning)│    │ (optimization) │  │
-│  └───────────────┘    └───────────────┘    └────────────────┘  │
-│          │                    │                     │           │
-│          ▼                    ▼                     ▼           │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              Direct PX4 Control Interface               │   │
-│  │  • TrajectorySetpoint (position + velocity + yaw)       │   │
-│  │  • OffboardControlMode (at 10Hz)                        │   │
-│  │  • VehicleCommand (arm, offboard mode)                  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-            │                                      ▲
-            │ /fmu/in/trajectory_setpoint          │ /fmu/out/vehicle_odometry
-            ▼                                      │
-┌─────────────────────────────────────────────────────────────────┐
-│                           PX4 SITL                              │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph node["mpc_obstacle_avoidance_node_v2"]
+        direction TB
+        
+        subgraph processing["Processing Pipeline"]
+            direction LR
+            LP["🔍 LidarProcessor<br/><i>clustering</i>"]
+            GN["🧭 GapNavigator<br/><i>path planning</i>"]
+            MPC["⚡ MPCSolver<br/><i>optimization</i>"]
+            LP --> GN --> MPC
+        end
+        
+        subgraph px4ctrl["Direct PX4 Control Interface"]
+            TS["📍 TrajectorySetpoint<br/>position + velocity + yaw"]
+            OCM["🎮 OffboardControlMode<br/>at 10Hz"]
+            VC["🚁 VehicleCommand<br/>arm, offboard mode"]
+        end
+        
+        processing --> px4ctrl
+    end
+    
+    subgraph px4["PX4 SITL"]
+        CTRL["Flight Controller"]
+    end
+    
+    subgraph sensors["Sensors"]
+        ODOM["/fmu/out/vehicle_odometry"]
+        SCAN["/scan - LiDAR"]
+    end
+    
+    node -->|"/fmu/in/trajectory_setpoint"| px4
+    px4 --> ODOM
+    ODOM -->|"Position, Velocity, Orientation"| node
+    SCAN -->|"LaserScan"| node
+
+    style node fill:#e1f5fe,stroke:#01579b
+    style px4 fill:#fff3e0,stroke:#e65100
+    style processing fill:#f3e5f5,stroke:#7b1fa2
+    style px4ctrl fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ### State and Input
