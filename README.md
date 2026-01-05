@@ -110,14 +110,14 @@ $$
 
 ### Obstacle-Aware Reference Trajectory
 
-Unlike v1's straight-line reference (which goes through walls), v2 uses a **potential field** approach to generate obstacle-aware references:
+Unlike v1's straight-line reference (which goes through walls), v2 uses a **potential field** approach to generate obstacle-aware references [1, 2]:
 
 $$
 p^{ref}_{k+1} = p^{ref}_k + \Delta t \cdot v_{desired} \cdot \hat{d}_{attractive} + \sum_i F_{repulsive,i}
 $$
 
 Where:
-- $\hat{d}_{attractive}$ = unit vector toward goal
+- $\hat{d}_{attractive}$ = unit vector toward goal (attractive potential gradient)
 - $F_{repulsive,i}$ = repulsive force from obstacle $i$:
 
 $$
@@ -128,6 +128,10 @@ F_{repulsive,i} = \begin{cases}
 $$
 
 Where $d_0$ is the influence distance and $\eta$ is the repulsion gain.
+
+> **References:**
+> 1. E. Rimon and D. E. Koditschek, *"Exact Robot Navigation Using Artificial Potential Functions"*, IEEE Transactions on Robotics and Automation, vol. 8, no. 5, pp. 501-518, 1992. [[DOI]](https://doi.org/10.1109/70.163777)
+> 2. S. S. Ge and Y. J. Cui, *"Dynamic Motion Planning for Mobile Robots Using Potential Field Method"*, Autonomous Robots, vol. 13, pp. 207-222, 2002. [[DOI]](https://doi.org/10.1023/A:1020564024509)
 
 ### Cost Function
 
