@@ -30,7 +30,7 @@ The MPC v2 is a complete rewrite addressing issues found in v1. Key improvements
 | PX4 Control | Via separate commander node | **Direct TrajectorySetpoint** |
 | Velocity | Position-only commands | **Velocity feedforward** |
 | Obstacle Constraints | Half-space constraints (can fail) | **Distance-based soft constraints** |
-| Reference Trajectory | Straight line (goes through walls) | **Potential field obstacle-aware** |
+| Reference Trajectory | Straight line or reference built from the current drone position | **Potential field obstacle-aware** |
 | Architecture | Multiple nodes | **Single self-contained node** |
 | Speed | Slow (~0.1 m/s) | **Fast (~2-3 m/s)** |
 
@@ -110,7 +110,7 @@ $$
 
 ### Obstacle-Aware Reference Trajectory
 
-Unlike v1's straight-line reference (which goes through walls), v2 uses a **potential field** approach to generate obstacle-aware references [1, 2]:
+Unlike v1's straight-line reference, v2 uses a **potential field** approach to generate obstacle-aware references [1, 2]:
 
 $$
 p^{ref}_{k+1} = p^{ref}_k + \Delta t \cdot v_{desired} \cdot \hat{d}_{attractive} + \sum_i F_{repulsive,i}
