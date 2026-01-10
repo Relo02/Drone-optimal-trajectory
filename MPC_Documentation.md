@@ -1,7 +1,6 @@
 # Model Predictive Control for Drone Obstacle Avoidance: Implementation Documentation
 
-**Drone Optimal Trajectory Project**  
-*January 10, 2026*
+**Drone Optimal Trajectory Project**
 
 ---
 
