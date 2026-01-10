@@ -209,9 +209,15 @@ class GapNavigator:
     
     min_gap_width: float = 1.2      # Minimum gap width in meters
     gap_goal_distance: float = 3.0  # How far to place intermediate goal
-    goal_alignment_weight: float = 0.7  # Balance between goal direction and gap quality
+    goal_alignment_weight: float = 0.8  # Weight for goal alignment in scoring
     direct_path_threshold: float = 3.0  # Min clear distance for direct path
     hysteresis_distance: float = 1.0    # Prevent oscillation between goals
+    safety_radius: float = 0.8          # Minimum obstacle clearance
+    safety_margin: float = 0.2          # Extra clearance beyond safety_radius
+    max_angle_from_goal: float = 1.57   # Max angle from goal direction (radians, ~90°)
+    alignment_penalty_angle: float = 0.52  # Angle threshold for alignment penalty (~30°)
+    alignment_penalty_factor: float = 0.8  # Penalty multiplier for misaligned gaps
+    velocity_turn_penalty: float = 0.5    # How much velocity affects turn penalty
     
     _current_intermediate: Optional[np.ndarray] = field(default=None, repr=False)
     
@@ -264,10 +270,6 @@ class GapNavigator:
         start_angle = angles[start_idx]
         end_angle = angles[end_idx]
         width_rad = end_angle - start_angle
-        width_meters = width_rad * max_range
-        
-        if width_meters < self.min_gap_width:
-            return None
         
         center_angle = (start_angle + end_angle) / 2
         
@@ -275,6 +277,14 @@ class GapNavigator:
         gap_ranges = ranges[start_idx:end_idx + 1]
         valid = np.isfinite(gap_ranges) & (gap_ranges > scan.range_min)
         min_range = np.min(gap_ranges[valid]) if np.any(valid) else max_range
+        
+        min_clearance = self.safety_radius + self.safety_margin
+        if min_range <= min_clearance:
+            return None
+        
+        width_meters = width_rad * min_range
+        if width_meters < self.min_gap_width:
+            return None
         
         return Gap(
             start_angle=start_angle,
@@ -291,7 +301,8 @@ class GapNavigator:
         position: np.ndarray,
         rotation: np.ndarray,
         final_goal: np.ndarray,
-        max_range: float
+        max_range: float,
+        velocity: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool, dict]:
         """
         Compute intermediate goal through best gap.
@@ -308,6 +319,8 @@ class GapNavigator:
             'best_gap_score': 0.0,
             'reason': '',
         }
+        
+        min_clearance = self.safety_radius + self.safety_margin
         
         # Direction to goal in body frame
         goal_world = final_goal[:2] - position[:2]
@@ -336,12 +349,24 @@ class GapNavigator:
         goal_body_y = np.dot(goal_world_norm, body_y)
         goal_angle_body = np.arctan2(goal_body_y, goal_body_x)
         
+        # Compute velocity direction in body frame for velocity-aware gap scoring
+        vel_angle_body = 0.0
+        current_speed = 0.0
+        if velocity is not None:
+            vel_world = velocity[:2]
+            current_speed = np.linalg.norm(vel_world)
+            if current_speed > 0.3:  # Only consider velocity if moving
+                vel_world_norm = vel_world / current_speed
+                vel_body_x = np.dot(vel_world_norm, body_x)
+                vel_body_y = np.dot(vel_world_norm, body_y)
+                vel_angle_body = np.arctan2(vel_body_y, vel_body_x)
+        
         # Check direct path clearance
         ranges = np.array(scan.ranges, dtype=float)
         angles = scan.angle_min + np.arange(len(ranges)) * scan.angle_increment
         
-        # Check cone around goal direction
-        cone_width = 0.4  # radians
+        # Check cone around goal direction (WIDE cone to catch walls)
+        cone_width = 1.2  # radians (~69°) - very wide to catch walls on sides
         cone_mask = np.abs(angles - goal_angle_body) < cone_width
         cone_ranges = ranges[cone_mask]
         cone_ranges = cone_ranges[np.isfinite(cone_ranges)]
@@ -349,15 +374,40 @@ class GapNavigator:
         min_cone_range = np.min(cone_ranges) if len(cone_ranges) > 0 else max_range
         debug['min_cone_range'] = min_cone_range
         
-        # Direct path check - more lenient when close to goal
+        # Direct path check - STRICT: need clear path to threshold distance
         direct_threshold = self.direct_path_threshold
         if close_to_goal:
-            direct_threshold = min(self.direct_path_threshold, goal_dist * 0.8)
+            direct_threshold = min(self.direct_path_threshold, goal_dist * 0.9)
         
-        if min_cone_range >= direct_threshold or min_cone_range >= goal_dist:
+        # CRITICAL FIX: If path is reasonably clear OR we have an intermediate goal that's leading us away,
+        # switch immediately to direct mode to prevent drift
+        path_is_clear = min_cone_range >= direct_threshold or min_cone_range >= goal_dist
+        
+        # Check if current intermediate goal is leading away from final goal
+        intermediate_drift = False
+        if self._current_intermediate is not None:
+            # Vector from drone to intermediate goal
+            to_intermediate = self._current_intermediate[:2] - position[:2]
+            intermediate_dist = np.linalg.norm(to_intermediate)
+            
+            if intermediate_dist > 0.1:
+                to_intermediate_norm = to_intermediate / intermediate_dist
+                # Check alignment with final goal direction
+                alignment = np.dot(to_intermediate_norm, goal_world_norm)
+                # If intermediate goal is more than 60° off from final goal, it's drifting
+                if alignment < 0.5:  # cos(60°) = 0.5
+                    intermediate_drift = True
+        
+        if path_is_clear:
             debug['reason'] = f'direct_path_clear (min_cone={min_cone_range:.2f}, thresh={direct_threshold:.2f})'
             self._current_intermediate = None
             return final_goal, True, debug
+        
+        # Force direct if intermediate is drifting
+        # if intermediate_drift:
+        #     debug['reason'] = f'intermediate_drift_correction (alignment < 60°)'
+        #     self._current_intermediate = None
+        #     return final_goal, False, debug
         
         # Find gaps and select best
         gaps = self.find_gaps(scan, max_range)
@@ -367,28 +417,42 @@ class GapNavigator:
             debug['reason'] = 'no_gaps_found'
             return final_goal, False, debug
         
-        # Score gaps
+        # Score gaps - MUST be in general direction of goal
         best_gap = None
         best_score = -np.inf
         
         for gap in gaps:
-            # Alignment with goal
+            # Alignment with goal direction
             angle_diff = gap.center_angle - goal_angle_body
             angle_diff = wrap_angle(angle_diff)
-            alignment = (np.pi - abs(angle_diff)) / np.pi
             
-            # Gap quality
-            quality = (gap.width_rad / np.pi) * (gap.min_range / max_range)
+            # REJECT gaps pointing away from goal (configurable threshold)
+            if abs(angle_diff) > self.max_angle_from_goal:
+                continue  # Skip this gap entirely
             
-            # Combined score
+            # Alignment score: 1.0 when perfectly aligned, 0.0 at max angle
+            alignment = 1.0 - (abs(angle_diff) / self.max_angle_from_goal)
+            
+            # Gap quality (width and depth)
+            clearance_ratio = (gap.min_range - min_clearance) / max(1e-6, max_range - min_clearance)
+            clearance_ratio = np.clip(clearance_ratio, 0.0, 1.0)
+            quality = (gap.width_rad / np.pi) * clearance_ratio
+            
+            # Combined score using configurable weight
             score = (self.goal_alignment_weight * alignment + 
-                     (1 - self.goal_alignment_weight) * quality)
+                     (1.0 - self.goal_alignment_weight) * quality)
             
-            # Penalize gaps pointing away from goal
-            if abs(angle_diff) > np.pi / 2:
-                score *= 0.1
-            elif abs(angle_diff) > np.pi / 3:
-                score *= 0.4
+            # Penalty for gaps not well aligned (configurable)
+            if abs(angle_diff) > self.alignment_penalty_angle:
+                score *= self.alignment_penalty_factor
+            
+            # Velocity-aware scoring: penalize gaps requiring sharp turns when moving fast
+            if current_speed > 0.3:
+                vel_to_gap_diff = wrap_angle(gap.center_angle - vel_angle_body)
+                turn_severity = abs(vel_to_gap_diff) / np.pi
+                speed_factor = min(current_speed / 1.5, 1.0)
+                turn_penalty = 1.0 - (turn_severity * speed_factor * self.velocity_turn_penalty)
+                score *= max(0.3, turn_penalty)
             
             gap.score = score
             if score > best_score:
@@ -396,7 +460,8 @@ class GapNavigator:
                 best_gap = gap
         
         if best_gap is None:
-            debug['reason'] = 'no_best_gap'
+            # No valid gap toward goal - go direct anyway (let MPC handle avoidance)
+            debug['reason'] = 'no_gap_toward_goal'
             return final_goal, False, debug
         
         debug['best_gap_angle'] = np.degrees(best_gap.center_angle)
@@ -404,11 +469,22 @@ class GapNavigator:
         
         # Compute intermediate goal position
         # Key fix: when close to goal, place intermediate goal closer or at goal
+        max_dist = max(0.0, best_gap.min_range - min_clearance)
+        if max_dist <= 0.0:
+            debug['reason'] = 'gap_clearance_too_small'
+            hold = position.copy()
+            self._current_intermediate = hold
+            return hold, False, debug
+        
         if close_to_goal:
             # Place intermediate goal at the goal or closer
-            dist = min(goal_dist, best_gap.min_range * 0.7)
+            dist = min(goal_dist * 0.8, max_dist)  # Don't exceed 80% of goal distance
         else:
-            dist = min(self.gap_goal_distance, best_gap.min_range * 0.7, goal_dist)
+            dist = min(self.gap_goal_distance, max_dist, goal_dist)
+        
+        # ADDITIONAL: Never place intermediate goal farther from final goal than we currently are
+        # This prevents creating waypoints that lead us away
+        dist = min(dist, goal_dist * 0.95)
         
         # Direction in body frame
         dir_body = np.array([
@@ -464,40 +540,54 @@ class MPCObstacleAvoidanceNode(Node):
     
     def _declare_parameters(self):
         """Declare all ROS parameters."""
-        # MPC parameters
+        # MPC parameters (tuned for gap navigation)
         self.declare_parameter('dt', 0.1)
-        self.declare_parameter('horizon', 20)
-        self.declare_parameter('safety_radius', 1.2)   # Increased for faster flight safety margin
-        self.declare_parameter('emergency_radius', 0.6) # Increased emergency brake distance
-        self.declare_parameter('max_velocity', 3.0)  # Increased for faster flight
-        self.declare_parameter('max_acceleration', 4.0)  # Increased for snappier response
+        self.declare_parameter('horizon', 20)  # 2 seconds
+        self.declare_parameter('safety_radius', 1.5)   # Smaller for fitting through gaps
+        self.declare_parameter('emergency_radius', 0.4) # Emergency brake
+        self.declare_parameter('max_velocity', 1.5)
+        self.declare_parameter('max_acceleration', 3.0)
         self.declare_parameter('max_yaw_rate', 1.5)
         
-        # MPC cost weights (tuning for speed)
-        self.declare_parameter('Q_pos', 100.0)       # Position tracking weight
-        self.declare_parameter('Q_vel', 0.05)        # Velocity regularization (lower = faster)
-        self.declare_parameter('R_acc', 0.05)       # Acceleration penalty (lower = more aggressive)
-        self.declare_parameter('Q_terminal', 200.0) # Terminal cost weight
+        # MPC cost weights
+        self.declare_parameter('Q_pos', 15.0)        # Position tracking (follow reference)
+        self.declare_parameter('Q_goal', 80.0)       # Goal attraction
+        self.declare_parameter('Q_vel', 1.0)         # Velocity regularization
+        self.declare_parameter('R_acc', 0.3)         # Acceleration penalty
+        self.declare_parameter('Q_terminal', 150.0)  # Terminal cost
+        self.declare_parameter('Q_vel_toward_obs', 50.0)  # Velocity toward obstacles
+        
+        # Potential field parameters (backup to gap navigation)
+        self.declare_parameter('Q_obstacle_repulsion', 300.0)
+        self.declare_parameter('potential_influence_dist', 3.0)
+        self.declare_parameter('potential_steepness', 2.0)
         
         # Goal parameters
         self.declare_parameter('goal', [10.0, 10.0, 1.5])
         self.declare_parameter('goal_threshold', 0.5)
         
         # Obstacle processing
-        self.declare_parameter('max_obstacle_range', 5.0)
+        self.declare_parameter('max_obstacle_range', 6.0)  # Match obstacle_range
         self.declare_parameter('cluster_size', 0.3)
         
         # Gap navigation
-        self.declare_parameter('gap_navigation_enabled', False)
+        self.declare_parameter('gap_navigation_enabled', True)
         self.declare_parameter('min_gap_width', 1.2)
-        self.declare_parameter('direct_path_threshold', 3.0)
+        self.declare_parameter('direct_path_threshold', 5.0)
+        self.declare_parameter('gap_safety_margin', 0.2)
+        self.declare_parameter('gap_goal_distance', 3.0)  # How far to place intermediate goal
+        self.declare_parameter('goal_alignment_weight', 0.5)  # Weight for goal alignment
+        self.declare_parameter('max_angle_from_goal', 1.57)  # Max angle from goal (~90°)
+        self.declare_parameter('alignment_penalty_angle', 0.52)  # Threshold for penalty (~30°)
+        self.declare_parameter('alignment_penalty_factor', 0.8)  # Penalty multiplier
+        self.declare_parameter('velocity_turn_penalty', 0.5)  # Velocity turn penalty factor
         
         # Control
         self.declare_parameter('require_enable', False)
         self.declare_parameter('log_interval', 5)
         
         # Frame
-        self.declare_parameter('trajectory_frame', 'map')
+        self.declare_parameter('trajectory_frame', 'world')
         
         # PX4 direct control
         self.declare_parameter('direct_px4_control', True)
@@ -518,11 +608,17 @@ class MPCObstacleAvoidanceNode(Node):
             a_max=self.get_parameter('max_acceleration').value,
             yaw_rate_max=self.get_parameter('max_yaw_rate').value,
             obstacle_range=self.get_parameter('max_obstacle_range').value,
-            # Cost weights for speed tuning
+            # Cost weights
             Q_pos=self.get_parameter('Q_pos').value,
+            Q_goal=self.get_parameter('Q_goal').value,
             Q_vel=self.get_parameter('Q_vel').value,
             R_acc=self.get_parameter('R_acc').value,
             Q_terminal=self.get_parameter('Q_terminal').value,
+            Q_vel_toward_obs=self.get_parameter('Q_vel_toward_obs').value,
+            # Potential field parameters
+            Q_obstacle_repulsion=self.get_parameter('Q_obstacle_repulsion').value,
+            potential_influence_dist=self.get_parameter('potential_influence_dist').value,
+            potential_steepness=self.get_parameter('potential_steepness').value,
         )
         
         # MPC solver
@@ -534,10 +630,18 @@ class MPCObstacleAvoidanceNode(Node):
             cluster_size=self.get_parameter('cluster_size').value,
         )
         
-        # Gap navigator
+        # Gap navigator with all configurable parameters
         self.gap_navigator = GapNavigator(
             min_gap_width=self.get_parameter('min_gap_width').value,
+            gap_goal_distance=self.get_parameter('gap_goal_distance').value,
+            goal_alignment_weight=self.get_parameter('goal_alignment_weight').value,
             direct_path_threshold=self.get_parameter('direct_path_threshold').value,
+            safety_radius=self.get_parameter('safety_radius').value,
+            safety_margin=self.get_parameter('gap_safety_margin').value,
+            max_angle_from_goal=self.get_parameter('max_angle_from_goal').value,
+            alignment_penalty_angle=self.get_parameter('alignment_penalty_angle').value,
+            alignment_penalty_factor=self.get_parameter('alignment_penalty_factor').value,
+            velocity_turn_penalty=self.get_parameter('velocity_turn_penalty').value,
         )
     
     def _init_state(self):
@@ -849,31 +953,30 @@ class MPCObstacleAvoidanceNode(Node):
         
         obstacles = ObstacleSet(clustered_points, self.mpc_config)
         
-        # Compute active goal (with gap navigation)
-        gap_enabled = self.get_parameter('gap_navigation_enabled').value
-        gap_debug = {}
-        
-        if gap_enabled and self.last_scan is not None:
+        # GAP NAVIGATION: Find clear corridors to navigate around walls
+        # This works better than pure potential field for walled environments
+        if self.last_scan is not None and self.gap_navigator is not None:
             active_goal, is_direct, gap_debug = self.gap_navigator.compute_intermediate_goal(
-                self.last_scan,
-                self.state.position,
-                self.rotation,
-                self.goal,
-                self.mpc_config.obstacle_range
+                scan=self.last_scan,
+                position=self.state.position,
+                rotation=self.rotation,
+                final_goal=self.goal,
+                max_range=self.mpc_config.obstacle_range,
+                velocity=self.state.velocity
             )
         else:
             active_goal = self.goal
             is_direct = True
-            gap_debug = {'reason': 'gap_nav_disabled'}
+            gap_debug = {'reason': 'no_scan_or_navigator'}
         
         # Publish goals for visualization
         self._publish_goals(active_goal, is_direct)
         
-        # Build reference trajectory
-        reference = self._build_reference(active_goal)
+        # Build reference trajectory with obstacle awareness
+        reference = self._build_reference(active_goal, obstacles=clustered_points)
         yaw_ref = self._build_yaw_reference(active_goal)
         
-        # Solve MPC
+        # Solve MPC (potential field + constraints handle obstacle avoidance)
         result = self.mpc_solver.solve(
             state=self.state,
             goal=active_goal,
@@ -940,29 +1043,110 @@ class MPCObstacleAvoidanceNode(Node):
             int_msg.pose.position.z = float(active_goal[2])
             self.intermediate_goal_pub.publish(int_msg)
     
-    def _build_reference(self, goal: np.ndarray) -> np.ndarray:
-        """Build position reference trajectory."""
+    def _build_reference(self, goal: np.ndarray, obstacles: np.ndarray = None) -> np.ndarray:
+        """
+        Build position reference trajectory using potential field approach.
+        
+        Creates a curved reference that bends around obstacles instead of
+        going straight through them - critical for avoiding wall collisions.
+        """
         N = self.mpc_config.N
         dt = self.mpc_config.dt
+        cfg = self.mpc_config
         
-        start = self.state.position
-        direction = goal - start
-        dist = np.linalg.norm(direction)
+        start = self.state.position.copy()
+        goal_dist = np.linalg.norm(goal - start)
         
-        if dist < 0.1:
+        if goal_dist < 0.1:
             return np.tile(goal, (N, 1))
         
-        direction = direction / dist
-        speed = min(self.mpc_config.v_max * 0.7, dist / (N * dt))
-        
+        # Use potential field to create obstacle-aware reference
         ref = np.zeros((N, 3))
+        pos = start.copy()
+        
+        # Potential field parameters for reference
+        base_repulsion_gain = 2.5   # Reduced base repulsion
+        attraction_gain = 1.5        # Increased attraction to goal
+        influence_radius = cfg.potential_influence_dist * 1.5  # ~6m influence
+        
         for k in range(N):
-            t = (k + 1) * dt
-            pos = start + direction * speed * t
-            if np.linalg.norm(pos - start) >= dist:
+            # Attractive force toward goal
+            to_goal = goal - pos
+            dist_to_goal = np.linalg.norm(to_goal)
+            
+            if dist_to_goal < 0.15:
                 ref[k:] = goal
                 break
+            
+            # Direction to goal (normalized)
+            goal_direction = to_goal / dist_to_goal if dist_to_goal > 0.01 else np.zeros(3)
+            
+            f_attractive = attraction_gain * to_goal / dist_to_goal
+            
+            # Repulsive force from obstacles (DIRECTIONALLY AWARE)
+            f_repulsive = np.zeros(3)
+            
+            if obstacles is not None and obstacles.shape[0] > 0:
+                rel_pos = pos - obstacles  # Vector from obstacle to pos
+                distances = np.linalg.norm(rel_pos, axis=1)
+                
+                for i, d in enumerate(distances):
+                    if d < influence_radius and d > 0.05:
+                        direction = rel_pos[i] / d
+                        
+                        # CRITICAL: Only apply strong repulsion if obstacle is blocking path to goal
+                        # Check if obstacle is in the direction of travel (dot product with goal direction)
+                        obstacle_to_pos = direction
+                        blocking_factor = max(0.0, -np.dot(obstacle_to_pos, goal_direction))
+                        
+                        # Repulsion strength decreases with distance
+                        base_strength = (1.0/d - 1.0/influence_radius) * (1.0/(d*d))
+                        
+                        # Close obstacles get full repulsion, far obstacles only if blocking
+                        if d < 2.0:  # Very close - always repel strongly
+                            repulsion_gain = base_repulsion_gain * 1.5
+                        else:  # Far obstacles - only repel if blocking path
+                            repulsion_gain = base_repulsion_gain * (0.3 + 0.7 * blocking_factor)
+                        
+                        strength = repulsion_gain * base_strength
+                        f_repulsive += strength * direction
+            
+            # Combine forces
+            f_total = f_attractive + f_repulsive
+            f_norm = np.linalg.norm(f_total)
+            
+            # Adaptive speed based on distance to goal (prevents overshoot)
+            # As we get closer, reduce speed proportionally
+            remaining_steps = N - k
+            time_remaining = remaining_steps * dt
+            
+            # Speed needed to reach goal in remaining time (with safety margin)
+            speed_to_goal = dist_to_goal / (time_remaining + dt)
+            
+            # Limit to reasonable range
+            speed = np.clip(speed_to_goal, 0.3, cfg.v_max * 0.6)
+            
+            # Further reduce speed when very close to goal
+            if dist_to_goal < 2.0:
+                speed = min(speed, dist_to_goal * 0.5)
+            
+            if f_norm > 0.01:
+                velocity = (f_total / f_norm) * speed
+            else:
+                velocity = (to_goal / dist_to_goal) * speed
+            
+            # Integrate position
+            pos = pos + velocity * dt
+            
+            # Clamp altitude
+            pos[2] = np.clip(pos[2], cfg.z_min + 0.1, cfg.z_max - 0.1)
+            
             ref[k] = pos
+            
+            # Check if reached goal
+            if np.linalg.norm(pos - goal) < 0.2:
+                ref[k:] = goal
+                break
         
         return ref
     

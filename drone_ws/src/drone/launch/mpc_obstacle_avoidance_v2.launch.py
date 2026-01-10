@@ -31,6 +31,12 @@ def generate_launch_description():
         description='Minimum distance from obstacles in meters'
     )
     
+    gap_safety_margin_arg = DeclareLaunchArgument(
+        'gap_safety_margin',
+        default_value='0.2',
+        description='Extra clearance beyond safety_radius for gap goals'
+    )
+    
     goal_arg = DeclareLaunchArgument(
         'goal',
         default_value='[10.0, 10.0, 1.5]',
@@ -88,6 +94,7 @@ def generate_launch_description():
             'gap_navigation_enabled': LaunchConfiguration('gap_navigation_enabled'),
             'min_gap_width': 1.2,
             'direct_path_threshold': 3.0,
+            'gap_safety_margin': LaunchConfiguration('gap_safety_margin'),
             'require_enable': LaunchConfiguration('require_enable'),
             'log_interval': 5,
             'trajectory_frame': 'map',
@@ -111,6 +118,7 @@ def generate_launch_description():
         dt_arg,
         horizon_arg,
         safety_radius_arg,
+        gap_safety_margin_arg,
         goal_arg,
         max_velocity_arg,
         gap_navigation_arg,
