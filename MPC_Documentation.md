@@ -641,20 +641,6 @@ Adjust $\alpha$ (`goal_alignment_weight`):
 
 This MPC implementation provides a robust framework for autonomous drone navigation in cluttered environments. The combination of gap-based navigation, potential field reference generation, and optimization-based control with hard safety constraints enables safe and efficient obstacle avoidance while maintaining smooth flight characteristics.
 
-### Key Advantages
-
-✅ **Predictive**: Plans ahead over a 2-second horizon, anticipating future obstacles
-
-✅ **Safe**: Hard constraints prevent collisions, emergency braking as last resort
-
-✅ **Smooth**: Continuous optimization produces natural trajectories without jerky motions
-
-✅ **Adaptive**: Gap navigation intelligently handles complex environments with narrow passages
-
-✅ **Real-time**: Solves in < 50 ms for typical scenarios (20 steps, 15 obstacles)
-
-✅ **Flexible**: Highly configurable parameters for different scenarios and drone capabilities
-
 ### System Performance
 
 | Metric | Typical Value |
