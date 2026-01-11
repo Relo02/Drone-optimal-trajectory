@@ -44,7 +44,7 @@ flowchart TB
         subgraph processing["Processing Pipeline"]
             direction LR
             LP["🔍 LidarProcessor<br/><i>clustering</i>"]
-            GN["🧭 GapNavigator<br/><i>path planning</i>"]
+            GN["🧭 APF (Artificial Potential Field)-GapDetector<br/><i>path planning</i>"]
             MPC["⚡ MPCSolver<br/><i>optimization</i>"]
             LP --> GN --> MPC
         end
