@@ -1,13 +1,14 @@
 """
-MPC Core - Clean Model Predictive Controller for Drone Obstacle Avoidance
+MPC Core - Model Predictive Controller for Drone Navigation
 
-This module provides a robust MPC implementation with:
-- Quadrotor double-integrator dynamics
-- Distance-based obstacle avoidance constraints
-- Proper safety margins and emergency behavior
-- Efficient CasADi-based optimization
+Provides efficient MPC implementation with:
+- Double-integrator dynamics model
+- Soft obstacle avoidance constraints
+- Emergency braking and recovery behaviors
+- CasADi-based nonlinear optimization
+- Warm-start support for real-time performance
 
-Author: Refactored implementation
+Author: Cleaned and refactored implementation
 """
 
 import numpy as np
@@ -19,42 +20,42 @@ from typing import Optional, Tuple, List
 @dataclass
 class MPCConfig:
     """MPC configuration parameters."""
-    # Horizon
-    dt: float = 0.1          # Time step [s]
-    N: int = 20              # Prediction horizon steps (2 seconds)
-    
-    # Safety (reasonable margins for gap navigation)
-    safety_radius: float = 0.8    # Safety margin from obstacles [m] (smaller for gaps)
-    emergency_radius: float = 0.4  # Emergency brake distance [m]
-    
-    # Limits
-    v_max: float = 2.0       # Max velocity [m/s]
-    a_max: float = 3.0       # Max acceleration [m/s²]
-    yaw_rate_max: float = 1.5    # Max yaw rate [rad/s]
-    yaw_accel_max: float = 2.0   # Max yaw acceleration [rad/s²]
-    z_min: float = 0.3       # Min altitude [m]
-    z_max: float = 10.0      # Max altitude [m]
-    
-    # Cost weights (tuned for gap navigation)
-    Q_pos: float = 15.0      # Position tracking (follow reference closely)
-    Q_goal: float = 80.0     # Goal attraction
-    Q_vel: float = 1.0       # Velocity regularization
-    Q_yaw: float = 2.0       # Yaw tracking weight
-    R_acc: float = 0.3       # Acceleration effort
-    R_yaw_acc: float = 0.5   # Yaw acceleration effort weight
-    Q_terminal: float = 150.0  # Terminal position weight
-    R_jerk: float = 0.3       # Jerk penalty
-    Q_vel_toward_obs: float = 50.0  # Velocity toward obstacles
-    
-    # Potential field obstacle avoidance (backup to gap navigation)
-    Q_obstacle_repulsion: float = 300.0  # Repulsive potential
-    potential_influence_dist: float = 3.0  # Start avoidance at 3m
-    potential_steepness: float = 2.0  # Steepness
-    
-    # Obstacle avoidance constraints
-    obstacle_weight: float = 5000.0  # Slack penalty
-    max_obstacles: int = 15   # Max obstacles per step
-    obstacle_range: float = 6.0  # Detect obstacles at 6m
+    # Time horizon
+    dt: float = 0.1
+    N: int = 20
+
+    # Safety margins
+    safety_radius: float = 0.8
+    emergency_radius: float = 0.4
+
+    # Physical limits
+    v_max: float = 2.0
+    a_max: float = 3.0
+    yaw_rate_max: float = 1.5
+    yaw_accel_max: float = 2.0
+    z_min: float = 0.3
+    z_max: float = 10.0
+
+    # Cost weights
+    Q_pos: float = 15.0
+    Q_goal: float = 80.0
+    Q_vel: float = 1.0
+    Q_yaw: float = 2.0
+    R_acc: float = 0.3
+    R_yaw_acc: float = 0.5
+    Q_terminal: float = 150.0
+    R_jerk: float = 0.3
+    Q_vel_toward_obs: float = 50.0
+
+    # Potential field parameters
+    Q_obstacle_repulsion: float = 300.0
+    potential_influence_dist: float = 3.0
+    potential_steepness: float = 2.0
+
+    # Obstacle constraints
+    obstacle_weight: float = 5000.0
+    max_obstacles: int = 15
+    obstacle_range: float = 6.0
 
 
 @dataclass 
@@ -116,16 +117,13 @@ class ObstacleSet:
     def get_relevant_obstacles(self, position: np.ndarray, direction: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Get obstacles relevant for constraint generation.
-        
-        Uses a combination of:
-        1. Distance-based selection (closest obstacles)
-        2. Angular coverage (ensure 360° coverage)
-        3. Direction weighting (prioritize obstacles in movement direction)
-        
+
+        Selects obstacles based on distance, angular coverage, and movement direction.
+
         Args:
             position: Current/reference position
             direction: Optional movement direction for prioritization
-            
+
         Returns:
             (K, 3) array of selected obstacle positions
         """
@@ -184,43 +182,36 @@ class ObstacleSet:
     def check_emergency(self, position: np.ndarray, velocity: Optional[np.ndarray] = None) -> Tuple[bool, Optional[np.ndarray]]:
         """
         Check if emergency braking is needed.
-        
+
         Args:
             position: Current drone position
-            velocity: Current velocity (used for speed-dependent threshold)
-        
+            velocity: Current velocity (for speed-dependent threshold)
+
         Returns:
-            (emergency_needed, escape_direction, min_distance)
+            (emergency_needed, escape_direction)
         """
         if self.all_points.shape[0] == 0:
             return False, None
-        
+
         rel_pos = self.all_points - position
         distances = np.linalg.norm(rel_pos, axis=1)
         min_dist = np.min(distances)
-        
-        # Speed-dependent emergency radius - only small adjustment
-        # Capped to prevent triggering from far away at high speeds
+
+        # Speed-dependent emergency threshold
         base_radius = self.config.emergency_radius
         if velocity is not None:
             speed = np.linalg.norm(velocity)
-            # Add ~0.1m per m/s of speed, capped at +0.3m total
             emergency_threshold = base_radius + min(0.1 * speed, 0.3)
         else:
             emergency_threshold = base_radius
-        
-        # Only trigger emergency if REALLY close
+
         if min_dist < emergency_threshold:
-            # Find escape direction (away from closest obstacle)
             closest_idx = np.argmin(distances)
             escape_dir = -rel_pos[closest_idx]
             escape_norm = np.linalg.norm(escape_dir)
-            if escape_norm > 1e-6:
-                escape_dir = escape_dir / escape_norm
-            else:
-                escape_dir = None
+            escape_dir = escape_dir / escape_norm if escape_norm > 1e-6 else None
             return True, escape_dir
-        
+
         return False, None
 
 
@@ -258,7 +249,121 @@ class MPCSolver:
         )
         
         return ca.Function('dynamics', [x, u], [x_next])
-    
+
+    def _compute_emergency_brake(
+        self,
+        velocity: np.ndarray,
+        escape_dir: Optional[np.ndarray],
+        config: MPCConfig
+    ) -> np.ndarray:
+        """
+        Compute emergency braking acceleration.
+
+        Args:
+            velocity: Current velocity
+            escape_dir: Direction away from nearest obstacle
+            config: MPC configuration
+
+        Returns:
+            Emergency braking acceleration
+        """
+        current_speed = np.linalg.norm(velocity)
+
+        # Base braking: decelerate at 50% of max acceleration
+        if current_speed > 0.1:
+            brake_acc = -velocity / current_speed * config.a_max * 0.5
+        else:
+            brake_acc = np.zeros(3)
+
+        # Add lateral escape component if available
+        if escape_dir is not None:
+            if current_speed > 0.1:
+                vel_dir = velocity / current_speed
+                dot_product = np.dot(escape_dir[:3], vel_dir)
+
+                # Only add escape if it doesn't oppose velocity too much
+                if dot_product > -0.5:
+                    lateral_escape = escape_dir[:3] - dot_product * vel_dir
+                    lateral_norm = np.linalg.norm(lateral_escape)
+                    if lateral_norm > 0.1:
+                        brake_acc[:3] += (lateral_escape / lateral_norm) * config.a_max * 0.3
+            else:
+                # Nearly stationary: use escape direction directly
+                brake_acc[:3] += escape_dir[:3] * config.a_max * 0.3
+
+        return np.clip(brake_acc, -config.a_max, config.a_max)
+
+    def _compute_recovery_trajectory(
+        self,
+        x0: np.ndarray,
+        goal: np.ndarray,
+        N: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute recovery trajectory and controls when solver fails.
+
+        Args:
+            x0: Initial state vector
+            goal: Goal position
+            N: Horizon length
+
+        Returns:
+            (X_opt, U_opt): State and control trajectories
+        """
+        cfg = self.config
+        current_pos = x0[:3]
+        current_vel = x0[4:7]
+        current_speed = np.linalg.norm(current_vel)
+
+        # Direction to goal
+        to_goal = goal - current_pos
+        goal_dist = np.linalg.norm(to_goal)
+        goal_dir = to_goal / goal_dist if goal_dist > 0.1 else np.zeros(3)
+
+        # Compute recovery acceleration
+        if current_speed > cfg.v_max * 0.2:
+            # Brake while steering toward goal
+            vel_toward_goal = np.dot(current_vel, goal_dir) if goal_dist > 0.1 else 0.0
+            brake_acc = -current_vel / current_speed * cfg.a_max * 0.8
+            vel_perpendicular = current_vel - vel_toward_goal * goal_dir
+            steer_acc = -vel_perpendicular * 2.0 + goal_dir * cfg.a_max * 0.3
+            recovery_acc = brake_acc + steer_acc * 0.5
+        else:
+            # Low speed: accelerate toward goal
+            recovery_acc = goal_dir * cfg.a_max * 0.5
+
+        recovery_acc = np.clip(recovery_acc, -cfg.a_max, cfg.a_max)
+
+        # Build recovery trajectory
+        X_opt = np.zeros((N + 1, 8))
+        X_opt[0] = x0
+        U_opt = np.zeros((N, 4))
+        U_opt[0, :3] = recovery_acc
+
+        for k in range(N):
+            if k == 0:
+                vel_k = current_vel + recovery_acc * cfg.dt
+            else:
+                vel_k = X_opt[k, 4:7]
+
+            vel_k = np.clip(vel_k, -cfg.v_max, cfg.v_max)
+            pos_k = X_opt[k, :3] + vel_k * cfg.dt
+
+            X_opt[k+1, :3] = pos_k
+            X_opt[k+1, 4:7] = vel_k
+
+            # Gradually steer toward goal
+            if k < N - 1:
+                to_goal_k = goal - pos_k
+                dist_k = np.linalg.norm(to_goal_k)
+                if dist_k > 0.1:
+                    goal_dir_k = to_goal_k / dist_k
+                    target_vel = goal_dir_k * min(cfg.v_max * 0.5, dist_k / (N * cfg.dt))
+                    acc_k = (target_vel - vel_k) / cfg.dt
+                    U_opt[k, :3] = np.clip(acc_k, -cfg.a_max * 0.5, cfg.a_max * 0.5)
+
+        return X_opt, U_opt
+
     def solve(
         self,
         state: MPCState,
@@ -289,41 +394,14 @@ class MPCSolver:
         x0 = state.to_vector()
         goal = np.asarray(goal).flatten()[:3]
         
-        # Check for emergency (speed-dependent threshold)
+        # Emergency braking check
         emergency, escape_dir = obstacles.check_emergency(state.position, state.velocity)
         if emergency:
-            # Gentle emergency braking - just slow down, don't reverse
-            current_speed = np.linalg.norm(state.velocity)
-            
-            if current_speed > 0.1:
-                # Proportional braking (gentle) - don't multiply by 2.0, use smaller factor
-                # This decelerates at ~0.5 * a_max instead of reversing direction
-                brake_acc = -state.velocity / current_speed * cfg.a_max * 0.5
-            else:
-                brake_acc = np.zeros(3)
-            
-            # Only add escape component if it doesn't oppose current velocity too much
-            # This prevents violent direction reversals
-            if escape_dir is not None and current_speed > 0.1:
-                vel_dir = state.velocity / current_speed
-                # Check if escape direction is reasonable (not directly opposing velocity)
-                dot_product = np.dot(escape_dir[:3], vel_dir)
-                if dot_product > -0.5:  # Escape isn't directly behind us
-                    # Add small lateral escape component
-                    lateral_escape = escape_dir[:3] - dot_product * vel_dir
-                    lateral_norm = np.linalg.norm(lateral_escape)
-                    if lateral_norm > 0.1:
-                        lateral_escape = lateral_escape / lateral_norm
-                        brake_acc[:3] += lateral_escape * cfg.a_max * 0.3
-            elif escape_dir is not None and current_speed <= 0.1:
-                # If nearly stationary, can use escape direction directly
-                brake_acc[:3] += escape_dir[:3] * cfg.a_max * 0.3
-            
-            brake_acc = np.clip(brake_acc, -cfg.a_max, cfg.a_max)
-            
+            brake_acc = self._compute_emergency_brake(state.velocity, escape_dir, cfg)
+
             return MPCResult(
                 success=True,
-                acceleration=brake_acc[:3],
+                acceleration=brake_acc,
                 yaw_acceleration=0.0,
                 predicted_trajectory=np.tile(x0, (N+1, 1)),
                 predicted_controls=np.zeros((N, 4)),
@@ -333,37 +411,28 @@ class MPCSolver:
                 emergency_stop=True
             )
         
-        # Check if current state violates constraints (need to relax bounds)
+        # Handle constraint violations with dynamic relaxation
         current_speed = np.linalg.norm(state.velocity)
-        speed_violation = current_speed > cfg.v_max
-        
-        # If speed is violated, we need dynamic constraint relaxation
         effective_v_max = cfg.v_max
-        if speed_violation:
-            # Allow current speed + margin to enable recovery
+
+        if current_speed > cfg.v_max:
             effective_v_max = current_speed * 1.2
-            # Clear warm start since previous solution may be invalid
             self._last_solution = None
         
-        # Build reference if not provided
-        if reference_trajectory is None:
-            # Try warm-start from previous solution first (best option)
+        # Build reference trajectory if not provided
+        if reference_trajectory is None: # is always false, since we pass the reference trajectory from mpc_wall_aware_node
             reference_trajectory = self._build_reference_from_previous(x0, goal)
-            
+
             if reference_trajectory is None:
-                # Use obstacle-aware reference (potential field)
                 obs_points = obstacles.all_points if obstacles.all_points.shape[0] > 0 else np.zeros((0, 3))
                 reference_trajectory = self._build_obstacle_aware_reference(
                     state.position, goal, obs_points
                 )
-        
+
+        # Build yaw reference if not provided
         if yaw_reference is None:
-            # Point toward goal
             goal_dir = goal[:2] - state.position[:2]
-            if np.linalg.norm(goal_dir) > 0.1:
-                target_yaw = np.arctan2(goal_dir[1], goal_dir[0])
-            else:
-                target_yaw = state.yaw
+            target_yaw = np.arctan2(goal_dir[1], goal_dir[0]) if np.linalg.norm(goal_dir) > 0.1 else state.yaw
             yaw_reference = np.full(N, target_yaw)
         
         # Get relevant obstacles for each horizon step
@@ -403,26 +472,23 @@ class MPCSolver:
         return result
     
     def _build_obstacle_aware_reference(
-        self, 
-        start: np.ndarray, 
-        goal: np.ndarray, 
+        self,
+        start: np.ndarray,
+        goal: np.ndarray,
         obstacles: np.ndarray,
         repulsion_gain: float = 1.5,
         attraction_gain: float = 1.0,
     ) -> np.ndarray:
         """
         Build reference trajectory using artificial potential field.
-        
-        This creates a reference that bends around obstacles instead of
-        going straight through them - critical for walled environments.
-        
+
         Args:
             start: Starting position
             goal: Goal position
             obstacles: (M, 3) obstacle positions
-            repulsion_gain: Strength of obstacle repulsion
-            attraction_gain: Strength of goal attraction
-            
+            repulsion_gain: Obstacle repulsion strength
+            attraction_gain: Goal attraction strength
+
         Returns:
             (N, 3) reference trajectory
         """
@@ -450,38 +516,28 @@ class MPCSolver:
             
             # Repulsive force from obstacles
             f_repulsive = np.zeros(3)
-            
+
             if obstacles.shape[0] > 0:
-                rel_pos = pos - obstacles  # Vector from obstacle to pos
+                rel_pos = pos - obstacles
                 distances = np.linalg.norm(rel_pos, axis=1)
-                
-                # LARGER influence radius for early avoidance in reference trajectory
-                influence_radius = cfg.potential_influence_dist * 1.5  # ~9m
-                
+                influence_radius = cfg.potential_influence_dist * 1.5
+
                 for i, d in enumerate(distances):
                     if d < influence_radius and d > 0.01:
-                        # Repulsive force: stronger when closer
-                        # F = gain * (1/d - 1/d0) * (1/d^2) * direction
                         strength = repulsion_gain * (1.0/d - 1.0/influence_radius) * (1.0/(d*d))
                         direction = rel_pos[i] / d
                         f_repulsive += strength * direction
             
-            # Combine forces
+            # Combine forces and compute velocity
             f_total = f_attractive + f_repulsive
             f_norm = np.linalg.norm(f_total)
-            
-            # Adaptive speed based on distance to goal (prevents overshoot)
-            # As we get closer, reduce speed proportionally
+
+            # Adaptive speed based on distance and remaining time
             remaining_steps = N - k
             time_remaining = remaining_steps * dt
-            
-            # Speed needed to reach goal in remaining time (with safety margin)
             speed_to_goal = dist_to_goal / (time_remaining + dt)
-            
-            # Limit to reasonable range
             speed = np.clip(speed_to_goal, 0.3, cfg.v_max * 0.7)
-            
-            # Further reduce speed when very close to goal
+
             if dist_to_goal < 2.0:
                 speed = min(speed, dist_to_goal * 0.5)
             
@@ -513,52 +569,44 @@ class MPCSolver:
         goal: np.ndarray,
     ) -> Optional[np.ndarray]:
         """
-        Build reference from previous MPC solution (warm start).
-        
-        This is often the best reference as it's already obstacle-aware
-        from the previous optimization.
-        
+        Build reference from previous MPC solution.
+
         Returns:
-            (N, 3) reference trajectory or None if not available
+            (N, 3) reference trajectory or None if unavailable
         """
         if self._last_solution is None:
             return None
-        
+
         X_prev, _ = self._last_solution
         N = self.config.N
-        
+
         # Check if previous solution is still relevant
         prev_start = X_prev[0, :3]
         start_error = np.linalg.norm(prev_start - x0[:3])
-        
-        if start_error > 1.0:  # Too far from previous trajectory
+        if start_error > 1.0:
             return None
-        
-        # Check if goal has changed significantly
+
+        # Check if goal changed significantly
         prev_end = X_prev[-1, :3]
         goal_change = np.linalg.norm(prev_end - goal)
-        
-        # If goal changed significantly (e.g., switched from gap waypoint to final goal),
-        # don't use warm start - rebuild reference from scratch
         if goal_change > 3.0:
             return None
-        
+
         # Shift trajectory forward by one step
         ref = np.zeros((N, 3))
-        ref[:N-1] = X_prev[2:N+1, :3]  # Shift by 1 step
-        
-        # Extend last part toward goal with deceleration consideration
+        ref[:N-1] = X_prev[2:N+1, :3]
+
+        # Extend toward goal
         last_pos = ref[N-2]
         to_goal = goal - last_pos
         dist = np.linalg.norm(to_goal)
-        
+
         if dist > 0.1:
-            # Limit step size to prevent overshoot
             step_size = min(self.config.v_max * self.config.dt * 0.5, dist * 0.5)
             ref[N-1] = last_pos + (to_goal / dist) * step_size
         else:
             ref[N-1] = goal
-        
+
         return ref
     
     def _solve_nlp(
@@ -570,31 +618,39 @@ class MPCSolver:
         obstacle_sets: List[np.ndarray],
         effective_v_max: float = None,
     ) -> MPCResult:
-        """Build and solve the NLP."""
+        """
+        Build and solve the nonlinear program.
+
+        Args:
+            x0: Initial state
+            goal: Goal position
+            p_ref: Reference position trajectory
+            yaw_ref: Reference yaw trajectory
+            obstacle_sets: Obstacles for each horizon step
+            effective_v_max: Optional relaxed velocity limit
+
+        Returns:
+            MPCResult with solution or recovery control
+        """
         cfg = self.config
         N = cfg.N
-        
-        # Use effective velocity limit if provided (for constraint relaxation)
         v_max = effective_v_max if effective_v_max is not None else cfg.v_max
-        
+
         # Decision variables
-        X = ca.MX.sym('X', N + 1, 8)  # States
-        U = ca.MX.sym('U', N, 4)       # Controls
-        
-        # Slack variables for obstacle constraints
+        X = ca.MX.sym('X', N + 1, 8)
+        U = ca.MX.sym('U', N, 4)
         n_slacks = sum(obs.shape[0] for obs in obstacle_sets)
         S = ca.MX.sym('S', n_slacks) if n_slacks > 0 else ca.MX.sym('S', 1)
-        
-        # Build dynamics function
+
         dynamics = self._build_dynamics()
-        
-        # Constraints and cost
-        g = []  # Constraints
+
+        # Initialize constraints and cost
+        g = []
         lbg = []
         ubg = []
-        J = 0   # Cost
-        
-        # Initial condition
+        J = 0
+
+        # Initial condition constraint
         g.append(X[0, :].T - ca.DM(x0))
         lbg += [0.0] * 8
         ubg += [0.0] * 8
@@ -612,16 +668,13 @@ class MPCSolver:
             lbg += [0.0] * 8
             ubg += [0.0] * 8
             
-            # Extract state components
             pk = xk[0:3]
             yawk = xk[3]
             vk = xk[4:7]
-            vk_next = xk_next[4:7]
-            
-            # Reference for this step
+
             p_ref_k = ca.DM(p_ref[min(k, p_ref.shape[0]-1)])
             yaw_ref_k = float(yaw_ref[min(k, len(yaw_ref)-1)])
-            
+
             # Stage cost
             J += cfg.Q_pos * ca.sumsqr(pk - p_ref_k)
             J += cfg.Q_goal * ca.sumsqr(pk - ca.DM(goal))
@@ -629,11 +682,10 @@ class MPCSolver:
             J += cfg.Q_yaw * ca.sumsqr(yawk - yaw_ref_k)
             J += cfg.R_acc * ca.sumsqr(uk[0:3])
             J += cfg.R_yaw_acc * ca.sumsqr(uk[3])
-            
-            # Jerk penalty: penalize changes in acceleration for smoother motion
+
+            # Jerk penalty for smoother motion
             if k > 0:
-                uk_prev = U[k - 1, :].T
-                jerk = uk[0:3] - uk_prev[0:3]
+                jerk = uk[0:3] - U[k - 1, 0:3].T
                 J += cfg.R_jerk * ca.sumsqr(jerk)
             
             # Altitude constraint
@@ -641,174 +693,82 @@ class MPCSolver:
             lbg.append(cfg.z_min)
             ubg.append(cfg.z_max)
             
-            # Obstacle avoidance using simple but effective approach
+            # Obstacle avoidance constraints
             obs_k = obstacle_sets[k]
             for i in range(obs_k.shape[0]):
                 obs_pos = ca.DM(obs_k[i])
-                
-                # Distance to obstacle
+
                 dist_sq = ca.sumsqr(pk - obs_pos)
                 dist = ca.sqrt(dist_sq + 0.01)
-                
+
                 d0 = cfg.potential_influence_dist
                 d_safe = cfg.safety_radius
-                
-                # Compute influence range (needed by velocity penalty)
-                in_range = ca.fmax(0, d0 - dist)  # Positive when dist < d0
-                
-                # ============================================================
-                # SIMPLE REPULSION: 1/distance when within influence range
-                # ============================================================
-                # COMMENTED OUT: Redundant with APF reference trajectory
-                # The reference trajectory already uses strong potential field
-                # (k_rep = 3.0, influence radius = 4.5m) to curve around obstacles.
-                # Hard constraints below provide safety guarantee.
-                # ============================================================
-                # repulsion = cfg.Q_obstacle_repulsion / (dist - d_safe * 0.5 + 0.5)
-                # J += repulsion * in_range / d0  # Scale by how far into range
-                
-                # ============================================================
-                # VELOCITY PENALTY: Don't fly toward obstacles
-                # ============================================================
+                in_range = ca.fmax(0, d0 - dist)
+
+                # Velocity penalty: discourage flying toward obstacles
                 obs_dir = (obs_pos[:3] - pk) / dist
-                vel_toward = ca.fmax(0, ca.dot(vk, obs_dir))  # Only positive (toward)
+                vel_toward = ca.fmax(0, ca.dot(vk, obs_dir))
                 J += cfg.Q_vel_toward_obs * vel_toward * vel_toward * in_range / d0
-                
-                # ============================================================
-                # HARD CONSTRAINT with slack (safety_radius = 1.5m now)
-                # ============================================================
+
+                # Hard constraint with slack variable
                 min_dist_sq = d_safe * d_safe
                 s_i = S[slack_idx] if n_slacks > 0 else 0
                 g.append(min_dist_sq - dist_sq - s_i)
                 lbg.append(-ca.inf)
                 ubg.append(0.0)
-                
+
                 if n_slacks > 0:
                     J += cfg.obstacle_weight * s_i * s_i
                     slack_idx += 1
         
-        # Terminal cost
+        # Terminal cost and constraint
         pk_N = X[N, 0:3].T
         J += cfg.Q_terminal * ca.sumsqr(pk_N - ca.DM(goal))
-        
-        # Terminal altitude constraint
         g.append(X[N, 2])
         lbg.append(cfg.z_min)
         ubg.append(cfg.z_max)
-        
+
         # Stack decision variables
         w = ca.vertcat(
             ca.reshape(X, -1, 1),
             ca.reshape(U, -1, 1),
             S if n_slacks > 0 else ca.DM([])
         )
-        
-        # Variable bounds (use effective velocity limit)
+
         lbx, ubx = self._build_variable_bounds(N, n_slacks, v_max)
-        
-        # Build NLP
         nlp = {'x': w, 'f': J, 'g': ca.vertcat(*g)}
         
         opts = {
             'ipopt.print_level': 0,
             'print_time': 0,
-            'ipopt.max_iter': 100,  # Increased iterations for better convergence
+            'ipopt.max_iter': 100,
             'ipopt.tol': 1e-4,
-            'ipopt.acceptable_tol': 1e-2,  # More tolerant acceptable solution
+            'ipopt.acceptable_tol': 1e-2,
             'ipopt.warm_start_init_point': 'yes',
             'ipopt.mu_strategy': 'adaptive',
         }
-        
+
         solver = ca.nlpsol('mpc', 'ipopt', nlp, opts)
-        
-        # Initial guess (warm start from previous solution or straight line)
         w0 = self._build_initial_guess(x0, goal, p_ref, yaw_ref, N, n_slacks)
-        
-        # Solve
+
         sol = solver(x0=w0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
         stats = solver.stats()
-        
-        # Extract solution
+
         w_opt = np.array(sol['x']).flatten()
-        
         X_opt = w_opt[:(N+1)*8].reshape((N+1, 8), order='F')
         U_opt = w_opt[(N+1)*8:(N+1)*8 + N*4].reshape((N, 4), order='F')
         
-        # Check if solution is valid - if infeasible, apply safety behavior
+        # Check if solution is valid
         status = stats.get('return_status', 'unknown')
         is_infeasible = 'Infeasible' in status or not stats.get('success', False)
-        
+
         if is_infeasible:
-            # CRITICAL: Clear warm start cache when infeasible to prevent corruption
+            # Clear warm start cache to prevent corruption
             self._last_solution = None
-            
-            # Compute proper recovery control that steers toward goal
-            current_pos = x0[:3]
-            current_vel = x0[4:7]
-            current_speed = np.linalg.norm(current_vel)
-            
-            # Direction to goal
-            to_goal = goal - current_pos
-            goal_dist = np.linalg.norm(to_goal)
-            
-            if goal_dist > 0.1:
-                goal_dir = to_goal / goal_dist
-            else:
-                goal_dir = np.zeros(3)
-            
-            # Compute velocity component toward goal vs perpendicular
-            vel_toward_goal = np.dot(current_vel, goal_dir) if goal_dist > 0.1 else 0.0
-            
-            # Recovery acceleration: brake + steer toward goal
-            # Use a fraction of v_max as threshold for "moving" vs "stopped"
-            moving_threshold = cfg.v_max * 0.2
-            if current_speed > moving_threshold:
-                # Strong braking (decelerate at a_max)
-                brake_acc = -current_vel / current_speed * cfg.a_max * 0.8
-                
-                # Add steering component toward goal (proportional to how far off-course)
-                vel_perpendicular = current_vel - vel_toward_goal * goal_dir
-                steer_acc = -vel_perpendicular * 2.0  # Correct perpendicular velocity
-                steer_acc += goal_dir * cfg.a_max * 0.3  # Pull toward goal
-                
-                recovery_acc = brake_acc + steer_acc * 0.5
-            else:
-                # Low speed: accelerate toward goal
-                recovery_acc = goal_dir * cfg.a_max * 0.5
-            
-            # Clamp to acceleration limits
-            recovery_acc = np.clip(recovery_acc, -cfg.a_max, cfg.a_max)
-            
-            # Override controls with recovery acceleration
-            U_opt[0, :3] = recovery_acc
-            
-            # Build a simple recovery trajectory toward goal
-            for k in range(N):
-                # Predict position with recovery control
-                if k == 0:
-                    vel_k = current_vel + recovery_acc * cfg.dt
-                else:
-                    vel_k = X_opt[k, 4:7]
-                
-                vel_k = np.clip(vel_k, -cfg.v_max, cfg.v_max)
-                pos_k = X_opt[k, :3] + vel_k * cfg.dt
-                
-                X_opt[k+1, :3] = pos_k
-                X_opt[k+1, 4:7] = vel_k
-                
-                # Gradually steer toward goal
-                if k < N - 1:
-                    to_goal_k = goal - pos_k
-                    dist_k = np.linalg.norm(to_goal_k)
-                    if dist_k > 0.1:
-                        goal_dir_k = to_goal_k / dist_k
-                        # Blend current velocity toward goal direction
-                        target_vel = goal_dir_k * min(cfg.v_max * 0.5, dist_k / (N * cfg.dt))
-                        acc_k = (target_vel - vel_k) / cfg.dt
-                        acc_k = np.clip(acc_k, -cfg.a_max * 0.5, cfg.a_max * 0.5)
-                        U_opt[k, :3] = acc_k
-            
-            # Don't store corrupted solution
+
+            # Compute recovery trajectory
+            X_opt, U_opt = self._compute_recovery_trajectory(x0, goal, N)
+
             return MPCResult(
                 success=False,
                 acceleration=U_opt[0, :3],
@@ -820,9 +780,9 @@ class MPCSolver:
                 status=f"RECOVERY: {status}"
             )
         
-        # Store for warm starting (only when successful)
+        # Store solution for warm starting
         self._last_solution = (X_opt, U_opt)
-        
+
         return MPCResult(
             success=stats['success'],
             acceleration=U_opt[0, :3],
@@ -830,7 +790,7 @@ class MPCSolver:
             predicted_trajectory=X_opt,
             predicted_controls=U_opt,
             cost=float(sol['f']),
-            solve_time_ms=0.0,  # Will be filled by caller
+            solve_time_ms=0.0,
             status=stats.get('return_status', 'unknown')
         )
     
@@ -839,39 +799,31 @@ class MPCSolver:
         cfg = self.config
         lbx = []
         ubx = []
-        
-        # Use provided v_max or default from config
+
         velocity_limit = v_max if v_max is not None else cfg.v_max
-        
-        # State bounds (column-major order)
-        # px, py
-        lbx += [-1000.0] * (N + 1) * 2
+
+        # State bounds (column-major)
+        lbx += [-1000.0] * (N + 1) * 2  # px, py
         ubx += [1000.0] * (N + 1) * 2
-        # pz
-        lbx += [cfg.z_min] * (N + 1)
+        lbx += [cfg.z_min] * (N + 1)     # pz
         ubx += [cfg.z_max] * (N + 1)
-        # yaw
-        lbx += [-1000.0] * (N + 1)
+        lbx += [-1000.0] * (N + 1)       # yaw
         ubx += [1000.0] * (N + 1)
-        # vx, vy, vz (use effective velocity limit)
-        lbx += [-velocity_limit] * (N + 1) * 3
+        lbx += [-velocity_limit] * (N + 1) * 3  # vx, vy, vz
         ubx += [velocity_limit] * (N + 1) * 3
-        # yaw_dot
-        lbx += [-cfg.yaw_rate_max] * (N + 1)
+        lbx += [-cfg.yaw_rate_max] * (N + 1)    # yaw_dot
         ubx += [cfg.yaw_rate_max] * (N + 1)
-        
-        # Control bounds (column-major order)
-        # ax, ay, az
-        lbx += [-cfg.a_max] * N * 3
+
+        # Control bounds
+        lbx += [-cfg.a_max] * N * 3      # ax, ay, az
         ubx += [cfg.a_max] * N * 3
-        # yaw_ddot
-        lbx += [-cfg.yaw_accel_max] * N
+        lbx += [-cfg.yaw_accel_max] * N  # yaw_ddot
         ubx += [cfg.yaw_accel_max] * N
-        
-        # Slack bounds (non-negative)
+
+        # Slack bounds
         lbx += [0.0] * n_slacks
-        ubx += [1000.0] * n_slacks  # Upper bound on slack
-        
+        ubx += [1000.0] * n_slacks
+
         return lbx, ubx
     
     def _build_initial_guess(
@@ -885,37 +837,33 @@ class MPCSolver:
     ) -> np.ndarray:
         """Build initial guess for warm starting."""
         cfg = self.config
-        
-        # Use previous solution if available
+
         if self._last_solution is not None:
             X_prev, U_prev = self._last_solution
-            # Shift forward
             X0 = np.zeros((N + 1, 8))
             X0[0] = x0
             X0[1:N] = X_prev[2:N+1]
             X0[N] = X_prev[N]
-            
+
             U0 = np.zeros((N, 4))
             U0[:N-1] = U_prev[1:]
             U0[N-1] = U_prev[N-1]
         else:
-            # Build from reference
             X0 = np.zeros((N + 1, 8))
             X0[0] = x0
-            
+
             for k in range(N):
                 X0[k + 1, :3] = p_ref[min(k, p_ref.shape[0]-1)]
                 X0[k + 1, 3] = yaw_ref[min(k, len(yaw_ref)-1)]
                 if k < p_ref.shape[0] - 1:
                     X0[k + 1, 4:7] = (p_ref[k + 1] - p_ref[k]) / cfg.dt
-            
+
             U0 = np.zeros((N, 4))
-        
-        # Stack
+
         w0 = np.concatenate([
             X0.flatten(order='F'),
             U0.flatten(order='F'),
             np.zeros(n_slacks)
         ])
-        
+
         return w0

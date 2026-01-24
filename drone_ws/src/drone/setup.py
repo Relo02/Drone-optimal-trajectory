@@ -16,6 +16,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/mpc_obstacle_avoidance_v2.launch.py']),
         ('share/' + package_name + '/urdf', ['urdf/x500_depth.urdf']),
         ('share/' + package_name + '/config', ['config/x500_depth_viz.rviz']),
+        ('share/' + package_name + '/config', ['config/laser_view.rviz']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -39,6 +40,7 @@ setup(
             'mpc_obstacle_avoidance = drone.mpc_obstalce_avoidance_node:main',
             'mpc_obstacle_avoidance_v2 = drone.mpc_obstacle_avoidance_node_v2:main',
             'mpc_visualizer = drone.mpc_visualizer:main',
+            'mpc_wall_aware_node = drone.mpc_wall_aware_node:main',
         ],
     },
 )

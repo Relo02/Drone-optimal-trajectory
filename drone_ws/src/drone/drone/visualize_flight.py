@@ -10,7 +10,9 @@ Generates comprehensive plots and animations from logged flight data:
 6. Cost function evolution
 
 Usage:
-    python visualize_flight.py /path/to/session_dir
+    python visualize_flight.py /path/to/session_dir [--interactive]
+
+    --interactive: Display plots in interactive GUI windows
 
 Author: Flight Analysis Team
 """
@@ -30,16 +32,24 @@ from flight_logger import load_flight_data, GridSnapshot, FlightDataPoint
 class FlightVisualizer:
     """Generate comprehensive visualizations from flight data."""
 
-    def __init__(self, session_dir: str):
+    def __init__(self, session_dir: str, interactive: bool = False):
         """
         Initialize visualizer.
 
         Args:
             session_dir: Path to logged session directory
+            interactive: If True, display plots interactively instead of saving
         """
         self.session_dir = Path(session_dir)
-        self.output_dir = self.session_dir / "plots"
-        self.output_dir.mkdir(exist_ok=True)
+        self.interactive = interactive
+
+        # Verify session directory exists
+        if not self.session_dir.exists():
+            raise FileNotFoundError(f"Session directory not found: {session_dir}")
+
+        if not self.interactive:
+            self.output_dir = self.session_dir / "plots"
+            self.output_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"Loading flight data from: {session_dir}")
         self.flight_data, self.grid_snapshots, self.metadata = load_flight_data(session_dir)
@@ -51,6 +61,16 @@ class FlightVisualizer:
 
         # Extract arrays for easy plotting
         self._extract_arrays()
+
+    def _save_or_show(self, filename: str):
+        """Save plot to file or show interactively based on mode."""
+        if self.interactive:
+            plt.show()
+        else:
+            output_file = self.output_dir / filename
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            print(f"Saved: {output_file}")
+            plt.close()
 
     def _extract_arrays(self):
         """Extract numpy arrays from flight data."""
@@ -116,10 +136,7 @@ class FlightVisualizer:
         ax.set_aspect('equal')
 
         plt.tight_layout()
-        output_file = self.output_dir / "trajectory_2d.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("trajectory_2d.png")
 
     def plot_trajectory_3d(self):
         """Plot 3D trajectory."""
@@ -149,10 +166,7 @@ class FlightVisualizer:
         ax.legend(fontsize=10)
 
         plt.tight_layout()
-        output_file = self.output_dir / "trajectory_3d.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("trajectory_3d.png")
 
     def plot_mpc_performance(self):
         """Plot MPC solver performance metrics."""
@@ -229,10 +243,7 @@ class FlightVisualizer:
 
         fig.suptitle('MPC Performance Metrics', fontsize=16, fontweight='bold', y=0.995)
 
-        output_file = self.output_dir / "mpc_performance.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("mpc_performance.png")
 
     def plot_occupancy_grid_evolution(self, num_snapshots: int = 9):
         """
@@ -301,10 +312,7 @@ class FlightVisualizer:
         fig.suptitle('Occupancy Grid Evolution (Inflated Obstacles)',
                      fontsize=18, fontweight='bold')
 
-        output_file = self.output_dir / "occupancy_grid_evolution.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("occupancy_grid_evolution.png")
 
     def plot_detailed_occupancy_with_trajectory(self):
         """Plot final occupancy grid with full trajectory overlay."""
@@ -359,10 +367,7 @@ class FlightVisualizer:
         ax.grid(True, alpha=0.3, color='yellow', linewidth=0.5)
         ax.set_aspect('equal')
 
-        output_file = self.output_dir / "occupancy_grid_with_trajectory.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("occupancy_grid_with_trajectory.png")
 
     def plot_statistics_summary(self):
         """Generate statistical summary plot."""
@@ -440,15 +445,16 @@ class FlightVisualizer:
 
         fig.suptitle('Flight Statistics Summary', fontsize=16, fontweight='bold')
 
-        output_file = self.output_dir / "statistics_summary.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"Saved: {output_file}")
-        plt.close()
+        self._save_or_show("statistics_summary.png")
 
     def generate_all_plots(self):
         """Generate all visualization plots."""
 
-        print("\nGenerating visualizations...")
+        if self.interactive:
+            print("\nDisplaying visualizations in interactive mode...")
+            print("Close each window to proceed to the next plot.")
+        else:
+            print("\nGenerating visualizations...")
         print("=" * 50)
 
         self.plot_trajectory_2d()
@@ -459,14 +465,17 @@ class FlightVisualizer:
         self.plot_statistics_summary()
 
         print("=" * 50)
-        print(f"\nAll plots saved to: {self.output_dir}")
-        print("\nGenerated plots:")
-        print("  1. trajectory_2d.png - 2D trajectory view")
-        print("  2. trajectory_3d.png - 3D trajectory view")
-        print("  3. mpc_performance.png - MPC metrics over time")
-        print("  4. occupancy_grid_evolution.png - Grid evolution")
-        print("  5. occupancy_grid_with_trajectory.png - Final grid + trajectory")
-        print("  6. statistics_summary.png - Performance summary")
+        if not self.interactive:
+            print(f"\nAll plots saved to: {self.output_dir}")
+            print("\nGenerated plots:")
+            print("  1. trajectory_2d.png - 2D trajectory view")
+            print("  2. trajectory_3d.png - 3D trajectory view")
+            print("  3. mpc_performance.png - MPC metrics over time")
+            print("  4. occupancy_grid_evolution.png - Grid evolution")
+            print("  5. occupancy_grid_with_trajectory.png - Final grid + trajectory")
+            print("  6. statistics_summary.png - Performance summary")
+        else:
+            print("\nAll plots displayed.")
 
 
 def main():
@@ -478,7 +487,12 @@ def main():
     parser.add_argument(
         'session_dir',
         type=str,
-        help='Path to session directory (e.g., /tmp/drone_logs/session_20250124_153045)'
+        help='Path to session directory (e.g., /tmp/drone_logs/session_20260124_210333)'
+    )
+    parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help='Display plots in interactive GUI windows instead of saving to files'
     )
     parser.add_argument(
         '--output-dir',
@@ -490,9 +504,9 @@ def main():
     args = parser.parse_args()
 
     # Create visualizer
-    visualizer = FlightVisualizer(args.session_dir)
+    visualizer = FlightVisualizer(args.session_dir, interactive=args.interactive)
 
-    if args.output_dir:
+    if args.output_dir and not args.interactive:
         visualizer.output_dir = Path(args.output_dir)
         visualizer.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -504,5 +518,9 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         main()
     else:
-        print("Usage: python visualize_flight.py <session_dir>")
-        print("Example: python visualize_flight.py /tmp/drone_logs/session_20250124_153045")
+        print("Usage: python visualize_flight.py <session_dir> [--interactive]")
+        print("\nExamples:")
+        print("  Save plots to files:")
+        print("    python3 visualize_flight.py /tmp/drone_logs/session_20260124_210333")
+        print("\n  Display in interactive GUI:")
+        print("    python3 visualize_flight.py /tmp/drone_logs/session_20260124_210333 --interactive")
