@@ -396,7 +396,7 @@ Simplified:     [A] ---------> [D] ---------> [F]
 
 ### 4.1 HIERARCHICAL CONTROL ARCHITECTURE
 
-Your system uses a two-layer approach:
+The system uses a two-layer approach:
 
 ```
 ┌─────────────────────────────────────────────┐
