@@ -220,7 +220,7 @@ A* is a graph-based path planning algorithm that finds the shortest path from a 
 3. Skip occupied cells (from occupancy grid)
 4. Repeat until goal is reached or no path exists
 
-### 3.2 A* IMPLEMENTATION IN YOUR CODE
+### 3.2 A* IMPLEMENTATION
 
 Location: [mpc_wall_aware_node.py:128-298](drone_ws/src/drone/drone/mpc_wall_aware_node.py#L128-L298)
 
