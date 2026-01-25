@@ -26,7 +26,7 @@ An occupancy grid is a probabilistic spatial representation that discretizes con
 
 Here, the center cell (1.0) is definitely occupied, while surrounding cells have lower probabilities representing uncertainty or inflation zones.
 
-### 1.2 GRID CONFIGURATION IN YOUR CODE
+### 1.2 GRID CONFIGURATION
 
 Location: [mpc_wall_aware_node.py:61-71](drone_ws/src/drone/drone/mpc_wall_aware_node.py#L61-L71)
 
