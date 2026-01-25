@@ -25,7 +25,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, OccupancyGrid
 from geometry_msgs.msg import PoseStamped, PointStamped
 from sensor_msgs.msg import PointCloud2, LaserScan
 from std_msgs.msg import Float64
@@ -55,6 +55,13 @@ class MPCVisualizer(Node):
         self.intermediate_goal = None
         self.cost = 0.0
         self.last_update = time.time()
+
+        # Occupancy grid data
+        self.occupancy_grid = None
+        self.grid_origin = np.zeros(2)
+        self.grid_resolution = 0.1
+        self.grid_width = 0
+        self.grid_height = 0
         
         # Thread lock for data access
         self.lock = threading.Lock()
@@ -109,7 +116,14 @@ class MPCVisualizer(Node):
             self._intermediate_goal_callback,
             10
         )
-        
+
+        self.create_subscription(
+            OccupancyGrid,
+            '/mpc/occupancy_grid',
+            self._occupancy_grid_callback,
+            10
+        )
+
         self.get_logger().info('MPC Visualizer started')
     
     def _ned_to_enu(self, pos_ned):
@@ -191,7 +205,22 @@ class MPCVisualizer(Node):
                 msg.pose.position.y,
                 msg.pose.position.z
             ])
-    
+
+    def _occupancy_grid_callback(self, msg: OccupancyGrid):
+        with self.lock:
+            # Store grid data
+            self.grid_width = msg.info.width
+            self.grid_height = msg.info.height
+            self.grid_resolution = msg.info.resolution
+            self.grid_origin = np.array([msg.info.origin.position.x, msg.info.origin.position.y])
+
+            # Convert grid data to 2D array
+            # OccupancyGrid data is in row-major order, values 0-100 or -1 for unknown
+            grid_data = np.array(msg.data, dtype=np.int8).reshape((self.grid_height, self.grid_width))
+
+            # Convert to probability (0-1) where -1 (unknown) becomes 0.5
+            self.occupancy_grid = np.where(grid_data < 0, 0.5, grid_data / 100.0)
+
     def get_visualization_data(self):
         """Thread-safe getter for visualization data."""
         with self.lock:
@@ -206,6 +235,11 @@ class MPCVisualizer(Node):
                 'intermediate_goal': self.intermediate_goal.copy() if self.intermediate_goal is not None else None,
                 'cost': self.cost,
                 'last_update': self.last_update,
+                'occupancy_grid': self.occupancy_grid.copy() if self.occupancy_grid is not None else None,
+                'grid_origin': self.grid_origin.copy(),
+                'grid_resolution': self.grid_resolution,
+                'grid_width': self.grid_width,
+                'grid_height': self.grid_height,
             }
 
 
@@ -247,8 +281,26 @@ def run_visualization(node: MPCVisualizer):
         ax3d.set_xlabel('X (m)')
         ax3d.set_ylabel('Y (m)')
         ax3d.set_zlabel('Z (m)')
-        ax3d.set_title('3D View')
-        
+        ax3d.set_title('3D View with Occupancy Grid')
+
+        # Display occupancy grid as ground plane in 3D
+        occupancy_grid = data['occupancy_grid']
+        if occupancy_grid is not None:
+            grid_origin = data['grid_origin']
+            grid_resolution = data['grid_resolution']
+            grid_width = data['grid_width']
+            grid_height = data['grid_height']
+
+            # Create meshgrid for the ground plane
+            x_grid = np.linspace(grid_origin[0], grid_origin[0] + grid_width * grid_resolution, grid_width)
+            y_grid = np.linspace(grid_origin[1], grid_origin[1] + grid_height * grid_resolution, grid_height)
+            X, Y = np.meshgrid(x_grid, y_grid)
+            Z = np.zeros_like(X)  # Ground plane at z=0
+
+            # Plot surface with occupancy values as colors
+            ax3d.plot_surface(X, Y, Z, facecolors=plt.cm.gray_r(occupancy_grid),
+                            rstride=5, cstride=5, alpha=0.3, antialiased=True, shade=False)
+
         # Drone position
         ax3d.scatter(*drone_pos, c='blue', s=100, marker='o', label='Drone')
         
@@ -312,11 +364,31 @@ def run_visualization(node: MPCVisualizer):
         # ========== XY Plot (Top-down) ==========
         ax_xy.set_xlabel('X (m)')
         ax_xy.set_ylabel('Y (m)')
-        ax_xy.set_title('Top-Down View (XY)')
+        ax_xy.set_title('Top-Down View (XY) with Occupancy Grid')
         ax_xy.set_aspect('equal')
         ax_xy.grid(True, alpha=0.3)
-        
-        # Obstacles
+
+        # Display occupancy grid as background
+        occupancy_grid = data['occupancy_grid']
+        if occupancy_grid is not None:
+            grid_origin = data['grid_origin']
+            grid_resolution = data['grid_resolution']
+            grid_width = data['grid_width']
+            grid_height = data['grid_height']
+
+            # Calculate extent for imshow
+            extent = [
+                grid_origin[0],
+                grid_origin[0] + grid_width * grid_resolution,
+                grid_origin[1],
+                grid_origin[1] + grid_height * grid_resolution
+            ]
+
+            # Display grid (use gray_r colormap: white=free, black=occupied)
+            ax_xy.imshow(occupancy_grid, origin='lower', extent=extent,
+                        cmap='gray_r', vmin=0, vmax=1, alpha=0.6, interpolation='nearest')
+
+        # Obstacles (point cloud overlay)
         if obs.shape[0] > 0:
             ax_xy.scatter(obs[:, 0], obs[:, 1], c='red', s=5, alpha=0.5)
         
@@ -376,33 +448,43 @@ def run_visualization(node: MPCVisualizer):
         # ========== Info Panel ==========
         goal_dist = np.linalg.norm(drone_pos - goal)
         int_goal_dist = np.linalg.norm(drone_pos - int_goal) if int_goal is not None else 0
-        
+
         time_since_update = time.time() - data['last_update']
         status_color = 'green' if time_since_update < 0.5 else 'orange' if time_since_update < 2.0 else 'red'
-        
+
+        # Occupancy grid stats
+        grid_status = "N/A"
+        if data['occupancy_grid'] is not None:
+            occupied_cells = np.sum(data['occupancy_grid'] > 0.5)
+            total_cells = data['grid_width'] * data['grid_height']
+            grid_status = f"{data['grid_width']}x{data['grid_height']} ({occupied_cells}/{total_cells} occupied)"
+
         info_text = f"""
         === MPC STATUS ===
-        
+
         Drone Position:
           X: {drone_pos[0]:.2f} m
           Y: {drone_pos[1]:.2f} m
           Z: {drone_pos[2]:.2f} m
           Yaw: {np.degrees(yaw):.1f}°
-        
+
         Goal Position:
           X: {goal[0]:.2f} m
           Y: {goal[1]:.2f} m
           Z: {goal[2]:.2f} m
-        
+
         Distances:
           To Goal: {goal_dist:.2f} m
           To Intermediate: {int_goal_dist:.2f} m
-        
+
         MPC:
           Cost: {data['cost']:.1f}
           Obstacles: {data['obstacles'].shape[0]}
           Trajectory pts: {opt.shape[0]}
-        
+
+        Occupancy Grid:
+          {grid_status}
+
         Update: {time_since_update:.2f}s ago
         """
         

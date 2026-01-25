@@ -39,13 +39,13 @@ import sys
 import os
 sys.path.append(os.path.dirname(__file__))
 
-from mpc_core import MPCConfig, MPCState, MPCSolver, ObstacleSet, MPCResult
-from mpc_obstacle_avoidance_node_v2 import (
+from drone.mpc_core import MPCConfig, MPCState, MPCSolver, ObstacleSet, MPCResult
+from drone.mpc_obstacle_avoidance_node_v2 import (
     ned_to_enu, quat_to_rotation_matrix, euler_from_quaternion,
     quaternion_from_euler, wrap_angle, LidarProcessor,
     _NED_TO_ENU, _FLU_TO_FRD
 )
-from flight_logger import FlightLogger
+from drone.flight_logger import FlightLogger
 
 
 # ============================================================================
@@ -68,7 +68,7 @@ class OccupancyGridMapper:
     def __post_init__(self):
         """Initialize the grid."""
         self.grid = np.zeros((self.height, self.width), dtype=np.float32)
-        self.decay_rate = 0.95  # Decay old observations
+        self.decay_rate = 0.90  # Decay old observations (faster decay to prevent saturation)
 
     def world_to_grid(self, pos: np.ndarray) -> Tuple[int, int]:
         """Convert world coordinates to grid indices."""
@@ -110,13 +110,13 @@ class OccupancyGridMapper:
         # Inflate obstacles for safety (simple dilation)
         self._inflate_obstacles()
 
-    def _inflate_obstacles(self, inflation_cells: int = 2):
+    def _inflate_obstacles(self, inflation_cells: int = 1):
         """Inflate obstacles by dilation for safety margin."""
         from scipy.ndimage import binary_dilation
 
         occupied = self.grid > 0.5
         inflated = binary_dilation(occupied, iterations=inflation_cells)
-        self.grid = np.where(inflated, np.maximum(self.grid, 0.7), self.grid)
+        self.grid = np.where(inflated, np.maximum(self.grid, 0.6), self.grid)
 
     def is_free(self, pos: np.ndarray, threshold: float = 0.3) -> bool:
         """Check if a position is free of obstacles."""
@@ -791,27 +791,46 @@ class MPCWallAwareNode(Node):
             self.get_logger().warn('No global path found, going direct to goal')
 
     def _build_straight_reference(self, goal: np.ndarray) -> np.ndarray:
-        """Build straight-line reference."""
+        """
+        Build reference trajectory with decoupled altitude control.
+        Maintains target altitude while moving horizontally toward goal.
+        """
         N = self.mpc_config.N
         dt = self.mpc_config.dt
 
         start = self.state.position.copy()
-        goal_dist = np.linalg.norm(goal - start)
 
-        if goal_dist < 0.1:
+        # Decouple horizontal and vertical motion
+        start_xy = start[:2]
+        goal_xy = goal[:2]
+        goal_z = goal[2]
+
+        # Horizontal distance only
+        horizontal_dist = np.linalg.norm(goal_xy - start_xy)
+
+        if horizontal_dist < 0.1:
+            # Already at goal horizontally, just maintain altitude
             return np.tile(goal, (N, 1))
 
-        direction = (goal - start) / goal_dist
+        # Horizontal direction
+        direction_xy = (goal_xy - start_xy) / horizontal_dist
+
+        # Calculate desired horizontal speed
         time_horizon = N * dt
-        desired_speed = min(goal_dist / time_horizon, self.mpc_config.v_max * 0.8)
+        desired_speed = min(horizontal_dist / time_horizon, self.mpc_config.v_max * 0.8)
 
         ref = np.zeros((N, 3))
         for k in range(N):
+            # Horizontal motion along straight line
             distance = desired_speed * dt * k
-            if distance >= goal_dist:
-                ref[k:] = goal
-                break
-            ref[k] = start + direction * distance
+            if distance >= horizontal_dist:
+                ref[k:, :2] = goal_xy
+            else:
+                ref[k, :2] = start_xy + direction_xy * distance
+
+            # Vertical motion: maintain goal altitude throughout
+            # This forces the MPC to find paths at the correct altitude
+            ref[k, 2] = goal_z
 
         return ref
 
