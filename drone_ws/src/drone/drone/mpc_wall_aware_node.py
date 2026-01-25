@@ -97,9 +97,14 @@ class OccupancyGridMapper:
         self.grid *= self.decay_rate
 
         # Mark obstacle cells
+        # For each detected obstacle, we increase the "belief" that a cell is occupied
+        # by adding 0.5 to its probability. If we see the same obstacle multiple times,
+        # our confidence grows (up to max 1.0). This creates a probabilistic occupancy
+        # map where repeatedly detected obstacles have higher certainty.
         for obs in obstacles:
-            gx, gy = self.world_to_grid(obs)
+            gx, gy = self.world_to_grid(obs)  # Convert world position to grid indices
             if self.is_valid(gx, gy):
+                # Accumulate evidence: +0.5 per detection, capped at 1.0 (fully occupied)
                 self.grid[gy, gx] = min(1.0, self.grid[gy, gx] + 0.5)
 
         # Inflate obstacles for safety (simple dilation)
