@@ -82,9 +82,9 @@ Where:
 
 The traversal cost for moving to a cell incorporates obstacle probability:
 
-$$\text{J_{cell}} = 1.0 + w \times P(\text{obstacle})$$
+$$J_{cell} = 1.0 + w \times P(\text{obstacle})$$
 
-$$\text{J_{move}} = \text{d} \times \text{J_{cell}}$$
+$$J_{move} = \text{d} \times J_{cell}$$
 
 Where $w$ = `obstacle_cost_weight` and $d$ = `distance` 
 
