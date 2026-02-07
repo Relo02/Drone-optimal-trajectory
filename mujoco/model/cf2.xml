@@ -1,0 +1,926 @@
+<?xml version="1.0"?>
+<mujoco model="cf2">
+  <compiler coordinate="local" meshdir="cf2" angle="radian"/>
+
+  <!-- Physics simulation options for realistic drone dynamics -->
+  <option integrator="RK4" timestep="0.001" gravity="0 0 -9.81"
+          density="1.225" viscosity="1.81e-5" wind="0 0 0">
+    <!-- density: air density at sea level (kg/m³) -->
+    <!-- viscosity: dynamic viscosity of air at 20°C (Pa·s) -->
+    <!-- wind: global wind velocity (can be modified for turbulence) -->
+    <flag warmstart="enable" constraint="enable" contact="enable"/>
+  </option>
+
+  <!-- Visual rendering settings -->
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <quality shadowsize="4096"/>
+    <map znear="0.01" zfar="100"/>
+  </visual>
+
+  <default>
+    <!-- Global contact/friction defaults for realistic surface interactions -->
+    <geom friction="0.8 0.02 0.01" solref="0.002 1" solimp="0.9 0.95 0.001"/>
+    <joint damping="0.001"/>
+    <default class="cf2">
+      <default class="visual">
+        <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+      </default>
+      <default class="collision">
+        <geom group="3" type="mesh"/>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <!-- Materials for CF2 drone -->
+    <material name="Material10-polished_plastic1_001" specular="0.5" shininess="0.225"
+      rgba="0.631373 0.658824 0.678431 1.0"/>
+    <material name="Material12-polished_gold_001" specular="0.5" shininess="0.225"
+      rgba="0.968627 0.878431 0.600000 1.0"/>
+    <material name="Material14-green_medium_gloss_plastic_001" specular="0.5" shininess="0.225"
+      rgba="0.109804 0.184314 0.000000 1.0"/>
+    <material name="Material15_001" specular="0.5" shininess="0.225"
+      rgba="0.792157 0.819608 0.933333 1.0"/>
+    <material name="Material3-polypropylene2_001" specular="0.5" shininess="0.225"
+      rgba="1.0 1.0 1.0 1.0"/>
+    <material name="Material6-black_medium_gloss_plastic_001" specular="0.5" shininess="0.225"
+      rgba="0.101961 0.101961 0.101961 1.0"/>
+    <material name="Material8-burnished_chrome_001" specular="0.5" shininess="0.225"
+      rgba="0.898039 0.898039 0.898039 1.0"/>
+
+    <!-- Visual meshes -->
+    <mesh file="cf2_0.obj"/>
+    <mesh file="cf2_1.obj"/>
+    <mesh file="cf2_2.obj"/>
+    <mesh file="cf2_3.obj"/>
+    <mesh file="cf2_4.obj"/>
+    <mesh file="cf2_5.obj"/>
+    <mesh file="cf2_6.obj"/>
+
+    <!-- Collision meshes -->
+    <mesh file="cf2_collision_0.obj"/>
+    <mesh file="cf2_collision_1.obj"/>
+    <mesh file="cf2_collision_2.obj"/>
+    <mesh file="cf2_collision_3.obj"/>
+    <mesh file="cf2_collision_4.obj"/>
+    <mesh file="cf2_collision_5.obj"/>
+    <mesh file="cf2_collision_6.obj"/>
+    <mesh file="cf2_collision_7.obj"/>
+    <mesh file="cf2_collision_8.obj"/>
+    <mesh file="cf2_collision_9.obj"/>
+    <mesh file="cf2_collision_10.obj"/>
+    <mesh file="cf2_collision_11.obj"/>
+    <mesh file="cf2_collision_12.obj"/>
+    <mesh file="cf2_collision_13.obj"/>
+    <mesh file="cf2_collision_14.obj"/>
+    <mesh file="cf2_collision_15.obj"/>
+    <mesh file="cf2_collision_16.obj"/>
+    <mesh file="cf2_collision_17.obj"/>
+    <mesh file="cf2_collision_18.obj"/>
+    <mesh file="cf2_collision_19.obj"/>
+    <mesh file="cf2_collision_20.obj"/>
+    <mesh file="cf2_collision_21.obj"/>
+    <mesh file="cf2_collision_22.obj"/>
+    <mesh file="cf2_collision_23.obj"/>
+    <mesh file="cf2_collision_24.obj"/>
+    <mesh file="cf2_collision_25.obj"/>
+    <mesh file="cf2_collision_26.obj"/>
+    <mesh file="cf2_collision_27.obj"/>
+    <mesh file="cf2_collision_28.obj"/>
+    <mesh file="cf2_collision_29.obj"/>
+    <mesh file="cf2_collision_30.obj"/>
+    <mesh file="cf2_collision_31.obj"/>
+  </asset>
+
+  <worldbody>
+    <body name="cf2" pos="0 0 0.0">
+      <inertial pos="0 0 0" mass="0.027" diaginertia="2.3951e-05 2.3951e-05 3.2347e-05"/>
+      <joint name="root" type="free" damping="0" armature="0"/>
+
+      <!-- Visual geometries -->
+      <geom class="visual" mesh="cf2_0" material="Material10-polished_plastic1_001"/>
+      <geom class="visual" mesh="cf2_1" material="Material12-polished_gold_001"/>
+      <geom class="visual" mesh="cf2_2" material="Material14-green_medium_gloss_plastic_001"/>
+      <geom class="visual" mesh="cf2_3" material="Material15_001"/>
+      <geom class="visual" mesh="cf2_4" material="Material3-polypropylene2_001"/>
+      <geom class="visual" mesh="cf2_5" material="Material6-black_medium_gloss_plastic_001"/>
+      <geom class="visual" mesh="cf2_6" material="Material8-burnished_chrome_001"/>
+
+      <!-- Collision geometries -->
+      <geom class="collision" mesh="cf2_collision_0"/>
+      <geom class="collision" mesh="cf2_collision_1"/>
+      <geom class="collision" mesh="cf2_collision_2"/>
+      <geom class="collision" mesh="cf2_collision_3"/>
+      <geom class="collision" mesh="cf2_collision_4"/>
+      <geom class="collision" mesh="cf2_collision_5"/>
+      <geom class="collision" mesh="cf2_collision_6"/>
+      <geom class="collision" mesh="cf2_collision_7"/>
+      <geom class="collision" mesh="cf2_collision_8"/>
+      <geom class="collision" mesh="cf2_collision_9"/>
+      <geom class="collision" mesh="cf2_collision_10"/>
+      <geom class="collision" mesh="cf2_collision_11"/>
+      <geom class="collision" mesh="cf2_collision_12"/>
+      <geom class="collision" mesh="cf2_collision_13"/>
+      <geom class="collision" mesh="cf2_collision_14"/>
+      <geom class="collision" mesh="cf2_collision_15"/>
+      <geom class="collision" mesh="cf2_collision_16"/>
+      <geom class="collision" mesh="cf2_collision_17"/>
+      <geom class="collision" mesh="cf2_collision_18"/>
+      <geom class="collision" mesh="cf2_collision_19"/>
+      <geom class="collision" mesh="cf2_collision_20"/>
+      <geom class="collision" mesh="cf2_collision_21"/>
+      <geom class="collision" mesh="cf2_collision_22"/>
+      <geom class="collision" mesh="cf2_collision_23"/>
+      <geom class="collision" mesh="cf2_collision_24"/>
+      <geom class="collision" mesh="cf2_collision_25"/>
+      <geom class="collision" mesh="cf2_collision_26"/>
+      <geom class="collision" mesh="cf2_collision_27"/>
+      <geom class="collision" mesh="cf2_collision_28"/>
+      <geom class="collision" mesh="cf2_collision_29"/>
+      <geom class="collision" mesh="cf2_collision_30"/>
+      <geom class="collision" mesh="cf2_collision_31"/>
+
+      <!-- Actuation site at center of mass -->
+      <site name="actuation" type="sphere" size="0.001" rgba="1 0 0 1" pos="0 0 0"/>
+
+      <!-- IMU sensor site -->
+      <site name="imu" type="box" size="0.002 0.002 0.002" rgba="0 1 0 1" pos="0 0 0"/>
+
+      <!-- Propeller bodies (visual spinning) -->
+      <body name="prop_fr" pos="0.0325 -0.0325 0.003">
+        <inertial pos="0 0 0" mass="0.0001" diaginertia="1e-9 1e-9 1e-9"/>
+        <joint name="prop_fr_joint" type="hinge" axis="0 0 1" damping="1e-9"/>
+        <geom type="cylinder" size="0.023 0.0005" rgba="0.2 0.2 0.2 0.3" contype="0" conaffinity="0"/>
+      </body>
+      <body name="prop_fl" pos="0.0325 0.0325 0.003">
+        <inertial pos="0 0 0" mass="0.0001" diaginertia="1e-9 1e-9 1e-9"/>
+        <joint name="prop_fl_joint" type="hinge" axis="0 0 1" damping="1e-9"/>
+        <geom type="cylinder" size="0.023 0.0005" rgba="0.2 0.2 0.2 0.3" contype="0" conaffinity="0"/>
+      </body>
+      <body name="prop_bl" pos="-0.0325 0.0325 0.003">
+        <inertial pos="0 0 0" mass="0.0001" diaginertia="1e-9 1e-9 1e-9"/>
+        <joint name="prop_bl_joint" type="hinge" axis="0 0 1" damping="1e-9"/>
+        <geom type="cylinder" size="0.023 0.0005" rgba="0.2 0.2 0.2 0.3" contype="0" conaffinity="0"/>
+      </body>
+      <body name="prop_br" pos="-0.0325 -0.0325 0.003">
+        <inertial pos="0 0 0" mass="0.0001" diaginertia="1e-9 1e-9 1e-9"/>
+        <joint name="prop_br_joint" type="hinge" axis="0 0 1" damping="1e-9"/>
+        <geom type="cylinder" size="0.023 0.0005" rgba="0.2 0.2 0.2 0.3" contype="0" conaffinity="0"/>
+      </body>
+
+      <!-- LIDAR: 360 rays in horizontal plane (1 degree resolution) -->
+      <site name="lidar_0" size="0.001" pos="0 0 0" quat="0.707107 -0.000000 0.707107 0.000000"/>
+      <site name="lidar_1" size="0.001" pos="0 0 0" quat="0.707107 -0.012341 0.706999 0.000000"/>
+      <site name="lidar_2" size="0.001" pos="0 0 0" quat="0.707107 -0.024678 0.706676 0.000000"/>
+      <site name="lidar_3" size="0.001" pos="0 0 0" quat="0.707107 -0.037007 0.706138 0.000000"/>
+      <site name="lidar_4" size="0.001" pos="0 0 0" quat="0.707107 -0.049325 0.705384 0.000000"/>
+      <site name="lidar_5" size="0.001" pos="0 0 0" quat="0.707107 -0.061628 0.704416 0.000000"/>
+      <site name="lidar_6" size="0.001" pos="0 0 0" quat="0.707107 -0.073913 0.703233 0.000000"/>
+      <site name="lidar_7" size="0.001" pos="0 0 0" quat="0.707107 -0.086175 0.701836 0.000000"/>
+      <site name="lidar_8" size="0.001" pos="0 0 0" quat="0.707107 -0.098410 0.700225 0.000000"/>
+      <site name="lidar_9" size="0.001" pos="0 0 0" quat="0.707107 -0.110616 0.698401 0.000000"/>
+      <site name="lidar_10" size="0.001" pos="0 0 0" quat="0.707107 -0.122788 0.696364 0.000000"/>
+      <site name="lidar_11" size="0.001" pos="0 0 0" quat="0.707107 -0.134922 0.694115 0.000000"/>
+      <site name="lidar_12" size="0.001" pos="0 0 0" quat="0.707107 -0.147016 0.691655 0.000000"/>
+      <site name="lidar_13" size="0.001" pos="0 0 0" quat="0.707107 -0.159064 0.688984 0.000000"/>
+      <site name="lidar_14" size="0.001" pos="0 0 0" quat="0.707107 -0.171065 0.686103 0.000000"/>
+      <site name="lidar_15" size="0.001" pos="0 0 0" quat="0.707107 -0.183013 0.683013 0.000000"/>
+      <site name="lidar_16" size="0.001" pos="0 0 0" quat="0.707107 -0.194905 0.679715 0.000000"/>
+      <site name="lidar_17" size="0.001" pos="0 0 0" quat="0.707107 -0.206738 0.676210 0.000000"/>
+      <site name="lidar_18" size="0.001" pos="0 0 0" quat="0.707107 -0.218508 0.672499 0.000000"/>
+      <site name="lidar_19" size="0.001" pos="0 0 0" quat="0.707107 -0.230211 0.668583 0.000000"/>
+      <site name="lidar_20" size="0.001" pos="0 0 0" quat="0.707107 -0.241845 0.664463 0.000000"/>
+      <site name="lidar_21" size="0.001" pos="0 0 0" quat="0.707107 -0.253404 0.660141 0.000000"/>
+      <site name="lidar_22" size="0.001" pos="0 0 0" quat="0.707107 -0.264887 0.655618 0.000000"/>
+      <site name="lidar_23" size="0.001" pos="0 0 0" quat="0.707107 -0.276289 0.650895 0.000000"/>
+      <site name="lidar_24" size="0.001" pos="0 0 0" quat="0.707107 -0.287606 0.645974 0.000000"/>
+      <site name="lidar_25" size="0.001" pos="0 0 0" quat="0.707107 -0.298836 0.640856 0.000000"/>
+      <site name="lidar_26" size="0.001" pos="0 0 0" quat="0.707107 -0.309975 0.635543 0.000000"/>
+      <site name="lidar_27" size="0.001" pos="0 0 0" quat="0.707107 -0.321020 0.630037 0.000000"/>
+      <site name="lidar_28" size="0.001" pos="0 0 0" quat="0.707107 -0.331967 0.624338 0.000000"/>
+      <site name="lidar_29" size="0.001" pos="0 0 0" quat="0.707107 -0.342812 0.618450 0.000000"/>
+      <site name="lidar_30" size="0.001" pos="0 0 0" quat="0.707107 -0.353553 0.612372 0.000000"/>
+      <site name="lidar_31" size="0.001" pos="0 0 0" quat="0.707107 -0.364187 0.606109 0.000000"/>
+      <site name="lidar_32" size="0.001" pos="0 0 0" quat="0.707107 -0.374710 0.599661 0.000000"/>
+      <site name="lidar_33" size="0.001" pos="0 0 0" quat="0.707107 -0.385118 0.593030 0.000000"/>
+      <site name="lidar_34" size="0.001" pos="0 0 0" quat="0.707107 -0.395409 0.586218 0.000000"/>
+      <site name="lidar_35" size="0.001" pos="0 0 0" quat="0.707107 -0.405580 0.579228 0.000000"/>
+      <site name="lidar_36" size="0.001" pos="0 0 0" quat="0.707107 -0.415627 0.572061 0.000000"/>
+      <site name="lidar_37" size="0.001" pos="0 0 0" quat="0.707107 -0.425547 0.564721 0.000000"/>
+      <site name="lidar_38" size="0.001" pos="0 0 0" quat="0.707107 -0.435338 0.557208 0.000000"/>
+      <site name="lidar_39" size="0.001" pos="0 0 0" quat="0.707107 -0.444997 0.549525 0.000000"/>
+      <site name="lidar_40" size="0.001" pos="0 0 0" quat="0.707107 -0.454519 0.541675 0.000000"/>
+      <site name="lidar_41" size="0.001" pos="0 0 0" quat="0.707107 -0.463904 0.533660 0.000000"/>
+      <site name="lidar_42" size="0.001" pos="0 0 0" quat="0.707107 -0.473147 0.525483 0.000000"/>
+      <site name="lidar_43" size="0.001" pos="0 0 0" quat="0.707107 -0.482246 0.517145 0.000000"/>
+      <site name="lidar_44" size="0.001" pos="0 0 0" quat="0.707107 -0.491198 0.508650 0.000000"/>
+      <site name="lidar_45" size="0.001" pos="0 0 0" quat="0.707107 -0.500000 0.500000 0.000000"/>
+      <site name="lidar_46" size="0.001" pos="0 0 0" quat="0.707107 -0.508650 0.491198 0.000000"/>
+      <site name="lidar_47" size="0.001" pos="0 0 0" quat="0.707107 -0.517145 0.482246 0.000000"/>
+      <site name="lidar_48" size="0.001" pos="0 0 0" quat="0.707107 -0.525483 0.473147 0.000000"/>
+      <site name="lidar_49" size="0.001" pos="0 0 0" quat="0.707107 -0.533660 0.463904 0.000000"/>
+      <site name="lidar_50" size="0.001" pos="0 0 0" quat="0.707107 -0.541675 0.454519 0.000000"/>
+      <site name="lidar_51" size="0.001" pos="0 0 0" quat="0.707107 -0.549525 0.444997 0.000000"/>
+      <site name="lidar_52" size="0.001" pos="0 0 0" quat="0.707107 -0.557208 0.435338 0.000000"/>
+      <site name="lidar_53" size="0.001" pos="0 0 0" quat="0.707107 -0.564721 0.425547 0.000000"/>
+      <site name="lidar_54" size="0.001" pos="0 0 0" quat="0.707107 -0.572061 0.415627 0.000000"/>
+      <site name="lidar_55" size="0.001" pos="0 0 0" quat="0.707107 -0.579228 0.405580 0.000000"/>
+      <site name="lidar_56" size="0.001" pos="0 0 0" quat="0.707107 -0.586218 0.395409 0.000000"/>
+      <site name="lidar_57" size="0.001" pos="0 0 0" quat="0.707107 -0.593030 0.385118 0.000000"/>
+      <site name="lidar_58" size="0.001" pos="0 0 0" quat="0.707107 -0.599661 0.374710 0.000000"/>
+      <site name="lidar_59" size="0.001" pos="0 0 0" quat="0.707107 -0.606109 0.364187 0.000000"/>
+      <site name="lidar_60" size="0.001" pos="0 0 0" quat="0.707107 -0.612372 0.353553 0.000000"/>
+      <site name="lidar_61" size="0.001" pos="0 0 0" quat="0.707107 -0.618450 0.342812 0.000000"/>
+      <site name="lidar_62" size="0.001" pos="0 0 0" quat="0.707107 -0.624338 0.331967 0.000000"/>
+      <site name="lidar_63" size="0.001" pos="0 0 0" quat="0.707107 -0.630037 0.321020 0.000000"/>
+      <site name="lidar_64" size="0.001" pos="0 0 0" quat="0.707107 -0.635543 0.309975 0.000000"/>
+      <site name="lidar_65" size="0.001" pos="0 0 0" quat="0.707107 -0.640856 0.298836 0.000000"/>
+      <site name="lidar_66" size="0.001" pos="0 0 0" quat="0.707107 -0.645974 0.287606 0.000000"/>
+      <site name="lidar_67" size="0.001" pos="0 0 0" quat="0.707107 -0.650895 0.276289 0.000000"/>
+      <site name="lidar_68" size="0.001" pos="0 0 0" quat="0.707107 -0.655618 0.264887 0.000000"/>
+      <site name="lidar_69" size="0.001" pos="0 0 0" quat="0.707107 -0.660141 0.253404 0.000000"/>
+      <site name="lidar_70" size="0.001" pos="0 0 0" quat="0.707107 -0.664463 0.241845 0.000000"/>
+      <site name="lidar_71" size="0.001" pos="0 0 0" quat="0.707107 -0.668583 0.230211 0.000000"/>
+      <site name="lidar_72" size="0.001" pos="0 0 0" quat="0.707107 -0.672499 0.218508 0.000000"/>
+      <site name="lidar_73" size="0.001" pos="0 0 0" quat="0.707107 -0.676210 0.206738 0.000000"/>
+      <site name="lidar_74" size="0.001" pos="0 0 0" quat="0.707107 -0.679715 0.194905 0.000000"/>
+      <site name="lidar_75" size="0.001" pos="0 0 0" quat="0.707107 -0.683013 0.183013 0.000000"/>
+      <site name="lidar_76" size="0.001" pos="0 0 0" quat="0.707107 -0.686103 0.171065 0.000000"/>
+      <site name="lidar_77" size="0.001" pos="0 0 0" quat="0.707107 -0.688984 0.159064 0.000000"/>
+      <site name="lidar_78" size="0.001" pos="0 0 0" quat="0.707107 -0.691655 0.147016 0.000000"/>
+      <site name="lidar_79" size="0.001" pos="0 0 0" quat="0.707107 -0.694115 0.134922 0.000000"/>
+      <site name="lidar_80" size="0.001" pos="0 0 0" quat="0.707107 -0.696364 0.122788 0.000000"/>
+      <site name="lidar_81" size="0.001" pos="0 0 0" quat="0.707107 -0.698401 0.110616 0.000000"/>
+      <site name="lidar_82" size="0.001" pos="0 0 0" quat="0.707107 -0.700225 0.098410 0.000000"/>
+      <site name="lidar_83" size="0.001" pos="0 0 0" quat="0.707107 -0.701836 0.086175 0.000000"/>
+      <site name="lidar_84" size="0.001" pos="0 0 0" quat="0.707107 -0.703233 0.073913 0.000000"/>
+      <site name="lidar_85" size="0.001" pos="0 0 0" quat="0.707107 -0.704416 0.061628 0.000000"/>
+      <site name="lidar_86" size="0.001" pos="0 0 0" quat="0.707107 -0.705384 0.049325 0.000000"/>
+      <site name="lidar_87" size="0.001" pos="0 0 0" quat="0.707107 -0.706138 0.037007 0.000000"/>
+      <site name="lidar_88" size="0.001" pos="0 0 0" quat="0.707107 -0.706676 0.024678 0.000000"/>
+      <site name="lidar_89" size="0.001" pos="0 0 0" quat="0.707107 -0.706999 0.012341 0.000000"/>
+      <site name="lidar_90" size="0.001" pos="0 0 0" quat="0.707107 -0.707107 0.000000 0.000000"/>
+      <site name="lidar_91" size="0.001" pos="0 0 0" quat="0.707107 -0.706999 -0.012341 0.000000"/>
+      <site name="lidar_92" size="0.001" pos="0 0 0" quat="0.707107 -0.706676 -0.024678 0.000000"/>
+      <site name="lidar_93" size="0.001" pos="0 0 0" quat="0.707107 -0.706138 -0.037007 0.000000"/>
+      <site name="lidar_94" size="0.001" pos="0 0 0" quat="0.707107 -0.705384 -0.049325 0.000000"/>
+      <site name="lidar_95" size="0.001" pos="0 0 0" quat="0.707107 -0.704416 -0.061628 0.000000"/>
+      <site name="lidar_96" size="0.001" pos="0 0 0" quat="0.707107 -0.703233 -0.073913 0.000000"/>
+      <site name="lidar_97" size="0.001" pos="0 0 0" quat="0.707107 -0.701836 -0.086175 0.000000"/>
+      <site name="lidar_98" size="0.001" pos="0 0 0" quat="0.707107 -0.700225 -0.098410 0.000000"/>
+      <site name="lidar_99" size="0.001" pos="0 0 0" quat="0.707107 -0.698401 -0.110616 0.000000"/>
+      <site name="lidar_100" size="0.001" pos="0 0 0" quat="0.707107 -0.696364 -0.122788 0.000000"/>
+      <site name="lidar_101" size="0.001" pos="0 0 0" quat="0.707107 -0.694115 -0.134922 0.000000"/>
+      <site name="lidar_102" size="0.001" pos="0 0 0" quat="0.707107 -0.691655 -0.147016 0.000000"/>
+      <site name="lidar_103" size="0.001" pos="0 0 0" quat="0.707107 -0.688984 -0.159064 0.000000"/>
+      <site name="lidar_104" size="0.001" pos="0 0 0" quat="0.707107 -0.686103 -0.171065 0.000000"/>
+      <site name="lidar_105" size="0.001" pos="0 0 0" quat="0.707107 -0.683013 -0.183013 0.000000"/>
+      <site name="lidar_106" size="0.001" pos="0 0 0" quat="0.707107 -0.679715 -0.194905 0.000000"/>
+      <site name="lidar_107" size="0.001" pos="0 0 0" quat="0.707107 -0.676210 -0.206738 0.000000"/>
+      <site name="lidar_108" size="0.001" pos="0 0 0" quat="0.707107 -0.672499 -0.218508 0.000000"/>
+      <site name="lidar_109" size="0.001" pos="0 0 0" quat="0.707107 -0.668583 -0.230211 0.000000"/>
+      <site name="lidar_110" size="0.001" pos="0 0 0" quat="0.707107 -0.664463 -0.241845 0.000000"/>
+      <site name="lidar_111" size="0.001" pos="0 0 0" quat="0.707107 -0.660141 -0.253404 0.000000"/>
+      <site name="lidar_112" size="0.001" pos="0 0 0" quat="0.707107 -0.655618 -0.264887 0.000000"/>
+      <site name="lidar_113" size="0.001" pos="0 0 0" quat="0.707107 -0.650895 -0.276289 0.000000"/>
+      <site name="lidar_114" size="0.001" pos="0 0 0" quat="0.707107 -0.645974 -0.287606 0.000000"/>
+      <site name="lidar_115" size="0.001" pos="0 0 0" quat="0.707107 -0.640856 -0.298836 0.000000"/>
+      <site name="lidar_116" size="0.001" pos="0 0 0" quat="0.707107 -0.635543 -0.309975 0.000000"/>
+      <site name="lidar_117" size="0.001" pos="0 0 0" quat="0.707107 -0.630037 -0.321020 0.000000"/>
+      <site name="lidar_118" size="0.001" pos="0 0 0" quat="0.707107 -0.624338 -0.331967 0.000000"/>
+      <site name="lidar_119" size="0.001" pos="0 0 0" quat="0.707107 -0.618450 -0.342812 0.000000"/>
+      <site name="lidar_120" size="0.001" pos="0 0 0" quat="0.707107 -0.612372 -0.353553 0.000000"/>
+      <site name="lidar_121" size="0.001" pos="0 0 0" quat="0.707107 -0.606109 -0.364187 0.000000"/>
+      <site name="lidar_122" size="0.001" pos="0 0 0" quat="0.707107 -0.599661 -0.374710 0.000000"/>
+      <site name="lidar_123" size="0.001" pos="0 0 0" quat="0.707107 -0.593030 -0.385118 0.000000"/>
+      <site name="lidar_124" size="0.001" pos="0 0 0" quat="0.707107 -0.586218 -0.395409 0.000000"/>
+      <site name="lidar_125" size="0.001" pos="0 0 0" quat="0.707107 -0.579228 -0.405580 0.000000"/>
+      <site name="lidar_126" size="0.001" pos="0 0 0" quat="0.707107 -0.572061 -0.415627 0.000000"/>
+      <site name="lidar_127" size="0.001" pos="0 0 0" quat="0.707107 -0.564721 -0.425547 0.000000"/>
+      <site name="lidar_128" size="0.001" pos="0 0 0" quat="0.707107 -0.557208 -0.435338 0.000000"/>
+      <site name="lidar_129" size="0.001" pos="0 0 0" quat="0.707107 -0.549525 -0.444997 0.000000"/>
+      <site name="lidar_130" size="0.001" pos="0 0 0" quat="0.707107 -0.541675 -0.454519 0.000000"/>
+      <site name="lidar_131" size="0.001" pos="0 0 0" quat="0.707107 -0.533660 -0.463904 0.000000"/>
+      <site name="lidar_132" size="0.001" pos="0 0 0" quat="0.707107 -0.525483 -0.473147 0.000000"/>
+      <site name="lidar_133" size="0.001" pos="0 0 0" quat="0.707107 -0.517145 -0.482246 0.000000"/>
+      <site name="lidar_134" size="0.001" pos="0 0 0" quat="0.707107 -0.508650 -0.491198 0.000000"/>
+      <site name="lidar_135" size="0.001" pos="0 0 0" quat="0.707107 -0.500000 -0.500000 0.000000"/>
+      <site name="lidar_136" size="0.001" pos="0 0 0" quat="0.707107 -0.491198 -0.508650 0.000000"/>
+      <site name="lidar_137" size="0.001" pos="0 0 0" quat="0.707107 -0.482246 -0.517145 0.000000"/>
+      <site name="lidar_138" size="0.001" pos="0 0 0" quat="0.707107 -0.473147 -0.525483 0.000000"/>
+      <site name="lidar_139" size="0.001" pos="0 0 0" quat="0.707107 -0.463904 -0.533660 0.000000"/>
+      <site name="lidar_140" size="0.001" pos="0 0 0" quat="0.707107 -0.454519 -0.541675 0.000000"/>
+      <site name="lidar_141" size="0.001" pos="0 0 0" quat="0.707107 -0.444997 -0.549525 0.000000"/>
+      <site name="lidar_142" size="0.001" pos="0 0 0" quat="0.707107 -0.435338 -0.557208 0.000000"/>
+      <site name="lidar_143" size="0.001" pos="0 0 0" quat="0.707107 -0.425547 -0.564721 0.000000"/>
+      <site name="lidar_144" size="0.001" pos="0 0 0" quat="0.707107 -0.415627 -0.572061 0.000000"/>
+      <site name="lidar_145" size="0.001" pos="0 0 0" quat="0.707107 -0.405580 -0.579228 0.000000"/>
+      <site name="lidar_146" size="0.001" pos="0 0 0" quat="0.707107 -0.395409 -0.586218 0.000000"/>
+      <site name="lidar_147" size="0.001" pos="0 0 0" quat="0.707107 -0.385118 -0.593030 0.000000"/>
+      <site name="lidar_148" size="0.001" pos="0 0 0" quat="0.707107 -0.374710 -0.599661 0.000000"/>
+      <site name="lidar_149" size="0.001" pos="0 0 0" quat="0.707107 -0.364187 -0.606109 0.000000"/>
+      <site name="lidar_150" size="0.001" pos="0 0 0" quat="0.707107 -0.353553 -0.612372 0.000000"/>
+      <site name="lidar_151" size="0.001" pos="0 0 0" quat="0.707107 -0.342812 -0.618450 0.000000"/>
+      <site name="lidar_152" size="0.001" pos="0 0 0" quat="0.707107 -0.331967 -0.624338 0.000000"/>
+      <site name="lidar_153" size="0.001" pos="0 0 0" quat="0.707107 -0.321020 -0.630037 0.000000"/>
+      <site name="lidar_154" size="0.001" pos="0 0 0" quat="0.707107 -0.309975 -0.635543 0.000000"/>
+      <site name="lidar_155" size="0.001" pos="0 0 0" quat="0.707107 -0.298836 -0.640856 0.000000"/>
+      <site name="lidar_156" size="0.001" pos="0 0 0" quat="0.707107 -0.287606 -0.645974 0.000000"/>
+      <site name="lidar_157" size="0.001" pos="0 0 0" quat="0.707107 -0.276289 -0.650895 0.000000"/>
+      <site name="lidar_158" size="0.001" pos="0 0 0" quat="0.707107 -0.264887 -0.655618 0.000000"/>
+      <site name="lidar_159" size="0.001" pos="0 0 0" quat="0.707107 -0.253404 -0.660141 0.000000"/>
+      <site name="lidar_160" size="0.001" pos="0 0 0" quat="0.707107 -0.241845 -0.664463 0.000000"/>
+      <site name="lidar_161" size="0.001" pos="0 0 0" quat="0.707107 -0.230211 -0.668583 0.000000"/>
+      <site name="lidar_162" size="0.001" pos="0 0 0" quat="0.707107 -0.218508 -0.672499 0.000000"/>
+      <site name="lidar_163" size="0.001" pos="0 0 0" quat="0.707107 -0.206738 -0.676210 0.000000"/>
+      <site name="lidar_164" size="0.001" pos="0 0 0" quat="0.707107 -0.194905 -0.679715 0.000000"/>
+      <site name="lidar_165" size="0.001" pos="0 0 0" quat="0.707107 -0.183013 -0.683013 0.000000"/>
+      <site name="lidar_166" size="0.001" pos="0 0 0" quat="0.707107 -0.171065 -0.686103 0.000000"/>
+      <site name="lidar_167" size="0.001" pos="0 0 0" quat="0.707107 -0.159064 -0.688984 0.000000"/>
+      <site name="lidar_168" size="0.001" pos="0 0 0" quat="0.707107 -0.147016 -0.691655 0.000000"/>
+      <site name="lidar_169" size="0.001" pos="0 0 0" quat="0.707107 -0.134922 -0.694115 0.000000"/>
+      <site name="lidar_170" size="0.001" pos="0 0 0" quat="0.707107 -0.122788 -0.696364 0.000000"/>
+      <site name="lidar_171" size="0.001" pos="0 0 0" quat="0.707107 -0.110616 -0.698401 0.000000"/>
+      <site name="lidar_172" size="0.001" pos="0 0 0" quat="0.707107 -0.098410 -0.700225 0.000000"/>
+      <site name="lidar_173" size="0.001" pos="0 0 0" quat="0.707107 -0.086175 -0.701836 0.000000"/>
+      <site name="lidar_174" size="0.001" pos="0 0 0" quat="0.707107 -0.073913 -0.703233 0.000000"/>
+      <site name="lidar_175" size="0.001" pos="0 0 0" quat="0.707107 -0.061628 -0.704416 0.000000"/>
+      <site name="lidar_176" size="0.001" pos="0 0 0" quat="0.707107 -0.049325 -0.705384 0.000000"/>
+      <site name="lidar_177" size="0.001" pos="0 0 0" quat="0.707107 -0.037007 -0.706138 0.000000"/>
+      <site name="lidar_178" size="0.001" pos="0 0 0" quat="0.707107 -0.024678 -0.706676 0.000000"/>
+      <site name="lidar_179" size="0.001" pos="0 0 0" quat="0.707107 -0.012341 -0.706999 0.000000"/>
+      <site name="lidar_180" size="0.001" pos="0 0 0" quat="0.707107 -0.000000 -0.707107 0.000000"/>
+      <site name="lidar_181" size="0.001" pos="0 0 0" quat="0.707107 0.012341 -0.706999 0.000000"/>
+      <site name="lidar_182" size="0.001" pos="0 0 0" quat="0.707107 0.024678 -0.706676 0.000000"/>
+      <site name="lidar_183" size="0.001" pos="0 0 0" quat="0.707107 0.037007 -0.706138 0.000000"/>
+      <site name="lidar_184" size="0.001" pos="0 0 0" quat="0.707107 0.049325 -0.705384 0.000000"/>
+      <site name="lidar_185" size="0.001" pos="0 0 0" quat="0.707107 0.061628 -0.704416 0.000000"/>
+      <site name="lidar_186" size="0.001" pos="0 0 0" quat="0.707107 0.073913 -0.703233 0.000000"/>
+      <site name="lidar_187" size="0.001" pos="0 0 0" quat="0.707107 0.086175 -0.701836 0.000000"/>
+      <site name="lidar_188" size="0.001" pos="0 0 0" quat="0.707107 0.098410 -0.700225 0.000000"/>
+      <site name="lidar_189" size="0.001" pos="0 0 0" quat="0.707107 0.110616 -0.698401 0.000000"/>
+      <site name="lidar_190" size="0.001" pos="0 0 0" quat="0.707107 0.122788 -0.696364 0.000000"/>
+      <site name="lidar_191" size="0.001" pos="0 0 0" quat="0.707107 0.134922 -0.694115 0.000000"/>
+      <site name="lidar_192" size="0.001" pos="0 0 0" quat="0.707107 0.147016 -0.691655 0.000000"/>
+      <site name="lidar_193" size="0.001" pos="0 0 0" quat="0.707107 0.159064 -0.688984 0.000000"/>
+      <site name="lidar_194" size="0.001" pos="0 0 0" quat="0.707107 0.171065 -0.686103 0.000000"/>
+      <site name="lidar_195" size="0.001" pos="0 0 0" quat="0.707107 0.183013 -0.683013 0.000000"/>
+      <site name="lidar_196" size="0.001" pos="0 0 0" quat="0.707107 0.194905 -0.679715 0.000000"/>
+      <site name="lidar_197" size="0.001" pos="0 0 0" quat="0.707107 0.206738 -0.676210 0.000000"/>
+      <site name="lidar_198" size="0.001" pos="0 0 0" quat="0.707107 0.218508 -0.672499 0.000000"/>
+      <site name="lidar_199" size="0.001" pos="0 0 0" quat="0.707107 0.230211 -0.668583 0.000000"/>
+      <site name="lidar_200" size="0.001" pos="0 0 0" quat="0.707107 0.241845 -0.664463 0.000000"/>
+      <site name="lidar_201" size="0.001" pos="0 0 0" quat="0.707107 0.253404 -0.660141 0.000000"/>
+      <site name="lidar_202" size="0.001" pos="0 0 0" quat="0.707107 0.264887 -0.655618 0.000000"/>
+      <site name="lidar_203" size="0.001" pos="0 0 0" quat="0.707107 0.276289 -0.650895 0.000000"/>
+      <site name="lidar_204" size="0.001" pos="0 0 0" quat="0.707107 0.287606 -0.645974 0.000000"/>
+      <site name="lidar_205" size="0.001" pos="0 0 0" quat="0.707107 0.298836 -0.640856 0.000000"/>
+      <site name="lidar_206" size="0.001" pos="0 0 0" quat="0.707107 0.309975 -0.635543 0.000000"/>
+      <site name="lidar_207" size="0.001" pos="0 0 0" quat="0.707107 0.321020 -0.630037 0.000000"/>
+      <site name="lidar_208" size="0.001" pos="0 0 0" quat="0.707107 0.331967 -0.624338 0.000000"/>
+      <site name="lidar_209" size="0.001" pos="0 0 0" quat="0.707107 0.342812 -0.618450 0.000000"/>
+      <site name="lidar_210" size="0.001" pos="0 0 0" quat="0.707107 0.353553 -0.612372 0.000000"/>
+      <site name="lidar_211" size="0.001" pos="0 0 0" quat="0.707107 0.364187 -0.606109 0.000000"/>
+      <site name="lidar_212" size="0.001" pos="0 0 0" quat="0.707107 0.374710 -0.599661 0.000000"/>
+      <site name="lidar_213" size="0.001" pos="0 0 0" quat="0.707107 0.385118 -0.593030 0.000000"/>
+      <site name="lidar_214" size="0.001" pos="0 0 0" quat="0.707107 0.395409 -0.586218 0.000000"/>
+      <site name="lidar_215" size="0.001" pos="0 0 0" quat="0.707107 0.405580 -0.579228 0.000000"/>
+      <site name="lidar_216" size="0.001" pos="0 0 0" quat="0.707107 0.415627 -0.572061 0.000000"/>
+      <site name="lidar_217" size="0.001" pos="0 0 0" quat="0.707107 0.425547 -0.564721 0.000000"/>
+      <site name="lidar_218" size="0.001" pos="0 0 0" quat="0.707107 0.435338 -0.557208 0.000000"/>
+      <site name="lidar_219" size="0.001" pos="0 0 0" quat="0.707107 0.444997 -0.549525 0.000000"/>
+      <site name="lidar_220" size="0.001" pos="0 0 0" quat="0.707107 0.454519 -0.541675 0.000000"/>
+      <site name="lidar_221" size="0.001" pos="0 0 0" quat="0.707107 0.463904 -0.533660 0.000000"/>
+      <site name="lidar_222" size="0.001" pos="0 0 0" quat="0.707107 0.473147 -0.525483 0.000000"/>
+      <site name="lidar_223" size="0.001" pos="0 0 0" quat="0.707107 0.482246 -0.517145 0.000000"/>
+      <site name="lidar_224" size="0.001" pos="0 0 0" quat="0.707107 0.491198 -0.508650 0.000000"/>
+      <site name="lidar_225" size="0.001" pos="0 0 0" quat="0.707107 0.500000 -0.500000 0.000000"/>
+      <site name="lidar_226" size="0.001" pos="0 0 0" quat="0.707107 0.508650 -0.491198 0.000000"/>
+      <site name="lidar_227" size="0.001" pos="0 0 0" quat="0.707107 0.517145 -0.482246 0.000000"/>
+      <site name="lidar_228" size="0.001" pos="0 0 0" quat="0.707107 0.525483 -0.473147 0.000000"/>
+      <site name="lidar_229" size="0.001" pos="0 0 0" quat="0.707107 0.533660 -0.463904 0.000000"/>
+      <site name="lidar_230" size="0.001" pos="0 0 0" quat="0.707107 0.541675 -0.454519 0.000000"/>
+      <site name="lidar_231" size="0.001" pos="0 0 0" quat="0.707107 0.549525 -0.444997 0.000000"/>
+      <site name="lidar_232" size="0.001" pos="0 0 0" quat="0.707107 0.557208 -0.435338 0.000000"/>
+      <site name="lidar_233" size="0.001" pos="0 0 0" quat="0.707107 0.564721 -0.425547 0.000000"/>
+      <site name="lidar_234" size="0.001" pos="0 0 0" quat="0.707107 0.572061 -0.415627 0.000000"/>
+      <site name="lidar_235" size="0.001" pos="0 0 0" quat="0.707107 0.579228 -0.405580 0.000000"/>
+      <site name="lidar_236" size="0.001" pos="0 0 0" quat="0.707107 0.586218 -0.395409 0.000000"/>
+      <site name="lidar_237" size="0.001" pos="0 0 0" quat="0.707107 0.593030 -0.385118 0.000000"/>
+      <site name="lidar_238" size="0.001" pos="0 0 0" quat="0.707107 0.599661 -0.374710 0.000000"/>
+      <site name="lidar_239" size="0.001" pos="0 0 0" quat="0.707107 0.606109 -0.364187 0.000000"/>
+      <site name="lidar_240" size="0.001" pos="0 0 0" quat="0.707107 0.612372 -0.353553 0.000000"/>
+      <site name="lidar_241" size="0.001" pos="0 0 0" quat="0.707107 0.618450 -0.342812 0.000000"/>
+      <site name="lidar_242" size="0.001" pos="0 0 0" quat="0.707107 0.624338 -0.331967 0.000000"/>
+      <site name="lidar_243" size="0.001" pos="0 0 0" quat="0.707107 0.630037 -0.321020 0.000000"/>
+      <site name="lidar_244" size="0.001" pos="0 0 0" quat="0.707107 0.635543 -0.309975 0.000000"/>
+      <site name="lidar_245" size="0.001" pos="0 0 0" quat="0.707107 0.640856 -0.298836 0.000000"/>
+      <site name="lidar_246" size="0.001" pos="0 0 0" quat="0.707107 0.645974 -0.287606 0.000000"/>
+      <site name="lidar_247" size="0.001" pos="0 0 0" quat="0.707107 0.650895 -0.276289 0.000000"/>
+      <site name="lidar_248" size="0.001" pos="0 0 0" quat="0.707107 0.655618 -0.264887 0.000000"/>
+      <site name="lidar_249" size="0.001" pos="0 0 0" quat="0.707107 0.660141 -0.253404 0.000000"/>
+      <site name="lidar_250" size="0.001" pos="0 0 0" quat="0.707107 0.664463 -0.241845 0.000000"/>
+      <site name="lidar_251" size="0.001" pos="0 0 0" quat="0.707107 0.668583 -0.230211 0.000000"/>
+      <site name="lidar_252" size="0.001" pos="0 0 0" quat="0.707107 0.672499 -0.218508 0.000000"/>
+      <site name="lidar_253" size="0.001" pos="0 0 0" quat="0.707107 0.676210 -0.206738 0.000000"/>
+      <site name="lidar_254" size="0.001" pos="0 0 0" quat="0.707107 0.679715 -0.194905 0.000000"/>
+      <site name="lidar_255" size="0.001" pos="0 0 0" quat="0.707107 0.683013 -0.183013 0.000000"/>
+      <site name="lidar_256" size="0.001" pos="0 0 0" quat="0.707107 0.686103 -0.171065 0.000000"/>
+      <site name="lidar_257" size="0.001" pos="0 0 0" quat="0.707107 0.688984 -0.159064 0.000000"/>
+      <site name="lidar_258" size="0.001" pos="0 0 0" quat="0.707107 0.691655 -0.147016 0.000000"/>
+      <site name="lidar_259" size="0.001" pos="0 0 0" quat="0.707107 0.694115 -0.134922 0.000000"/>
+      <site name="lidar_260" size="0.001" pos="0 0 0" quat="0.707107 0.696364 -0.122788 0.000000"/>
+      <site name="lidar_261" size="0.001" pos="0 0 0" quat="0.707107 0.698401 -0.110616 0.000000"/>
+      <site name="lidar_262" size="0.001" pos="0 0 0" quat="0.707107 0.700225 -0.098410 0.000000"/>
+      <site name="lidar_263" size="0.001" pos="0 0 0" quat="0.707107 0.701836 -0.086175 0.000000"/>
+      <site name="lidar_264" size="0.001" pos="0 0 0" quat="0.707107 0.703233 -0.073913 0.000000"/>
+      <site name="lidar_265" size="0.001" pos="0 0 0" quat="0.707107 0.704416 -0.061628 0.000000"/>
+      <site name="lidar_266" size="0.001" pos="0 0 0" quat="0.707107 0.705384 -0.049325 0.000000"/>
+      <site name="lidar_267" size="0.001" pos="0 0 0" quat="0.707107 0.706138 -0.037007 0.000000"/>
+      <site name="lidar_268" size="0.001" pos="0 0 0" quat="0.707107 0.706676 -0.024678 0.000000"/>
+      <site name="lidar_269" size="0.001" pos="0 0 0" quat="0.707107 0.706999 -0.012341 0.000000"/>
+      <site name="lidar_270" size="0.001" pos="0 0 0" quat="0.707107 0.707107 -0.000000 0.000000"/>
+      <site name="lidar_271" size="0.001" pos="0 0 0" quat="0.707107 0.706999 0.012341 0.000000"/>
+      <site name="lidar_272" size="0.001" pos="0 0 0" quat="0.707107 0.706676 0.024678 0.000000"/>
+      <site name="lidar_273" size="0.001" pos="0 0 0" quat="0.707107 0.706138 0.037007 0.000000"/>
+      <site name="lidar_274" size="0.001" pos="0 0 0" quat="0.707107 0.705384 0.049325 0.000000"/>
+      <site name="lidar_275" size="0.001" pos="0 0 0" quat="0.707107 0.704416 0.061628 0.000000"/>
+      <site name="lidar_276" size="0.001" pos="0 0 0" quat="0.707107 0.703233 0.073913 0.000000"/>
+      <site name="lidar_277" size="0.001" pos="0 0 0" quat="0.707107 0.701836 0.086175 0.000000"/>
+      <site name="lidar_278" size="0.001" pos="0 0 0" quat="0.707107 0.700225 0.098410 0.000000"/>
+      <site name="lidar_279" size="0.001" pos="0 0 0" quat="0.707107 0.698401 0.110616 0.000000"/>
+      <site name="lidar_280" size="0.001" pos="0 0 0" quat="0.707107 0.696364 0.122788 0.000000"/>
+      <site name="lidar_281" size="0.001" pos="0 0 0" quat="0.707107 0.694115 0.134922 0.000000"/>
+      <site name="lidar_282" size="0.001" pos="0 0 0" quat="0.707107 0.691655 0.147016 0.000000"/>
+      <site name="lidar_283" size="0.001" pos="0 0 0" quat="0.707107 0.688984 0.159064 0.000000"/>
+      <site name="lidar_284" size="0.001" pos="0 0 0" quat="0.707107 0.686103 0.171065 0.000000"/>
+      <site name="lidar_285" size="0.001" pos="0 0 0" quat="0.707107 0.683013 0.183013 0.000000"/>
+      <site name="lidar_286" size="0.001" pos="0 0 0" quat="0.707107 0.679715 0.194905 0.000000"/>
+      <site name="lidar_287" size="0.001" pos="0 0 0" quat="0.707107 0.676210 0.206738 0.000000"/>
+      <site name="lidar_288" size="0.001" pos="0 0 0" quat="0.707107 0.672499 0.218508 0.000000"/>
+      <site name="lidar_289" size="0.001" pos="0 0 0" quat="0.707107 0.668583 0.230211 0.000000"/>
+      <site name="lidar_290" size="0.001" pos="0 0 0" quat="0.707107 0.664463 0.241845 0.000000"/>
+      <site name="lidar_291" size="0.001" pos="0 0 0" quat="0.707107 0.660141 0.253404 0.000000"/>
+      <site name="lidar_292" size="0.001" pos="0 0 0" quat="0.707107 0.655618 0.264887 0.000000"/>
+      <site name="lidar_293" size="0.001" pos="0 0 0" quat="0.707107 0.650895 0.276289 0.000000"/>
+      <site name="lidar_294" size="0.001" pos="0 0 0" quat="0.707107 0.645974 0.287606 0.000000"/>
+      <site name="lidar_295" size="0.001" pos="0 0 0" quat="0.707107 0.640856 0.298836 0.000000"/>
+      <site name="lidar_296" size="0.001" pos="0 0 0" quat="0.707107 0.635543 0.309975 0.000000"/>
+      <site name="lidar_297" size="0.001" pos="0 0 0" quat="0.707107 0.630037 0.321020 0.000000"/>
+      <site name="lidar_298" size="0.001" pos="0 0 0" quat="0.707107 0.624338 0.331967 0.000000"/>
+      <site name="lidar_299" size="0.001" pos="0 0 0" quat="0.707107 0.618450 0.342812 0.000000"/>
+      <site name="lidar_300" size="0.001" pos="0 0 0" quat="0.707107 0.612372 0.353553 0.000000"/>
+      <site name="lidar_301" size="0.001" pos="0 0 0" quat="0.707107 0.606109 0.364187 0.000000"/>
+      <site name="lidar_302" size="0.001" pos="0 0 0" quat="0.707107 0.599661 0.374710 0.000000"/>
+      <site name="lidar_303" size="0.001" pos="0 0 0" quat="0.707107 0.593030 0.385118 0.000000"/>
+      <site name="lidar_304" size="0.001" pos="0 0 0" quat="0.707107 0.586218 0.395409 0.000000"/>
+      <site name="lidar_305" size="0.001" pos="0 0 0" quat="0.707107 0.579228 0.405580 0.000000"/>
+      <site name="lidar_306" size="0.001" pos="0 0 0" quat="0.707107 0.572061 0.415627 0.000000"/>
+      <site name="lidar_307" size="0.001" pos="0 0 0" quat="0.707107 0.564721 0.425547 0.000000"/>
+      <site name="lidar_308" size="0.001" pos="0 0 0" quat="0.707107 0.557208 0.435338 0.000000"/>
+      <site name="lidar_309" size="0.001" pos="0 0 0" quat="0.707107 0.549525 0.444997 0.000000"/>
+      <site name="lidar_310" size="0.001" pos="0 0 0" quat="0.707107 0.541675 0.454519 0.000000"/>
+      <site name="lidar_311" size="0.001" pos="0 0 0" quat="0.707107 0.533660 0.463904 0.000000"/>
+      <site name="lidar_312" size="0.001" pos="0 0 0" quat="0.707107 0.525483 0.473147 0.000000"/>
+      <site name="lidar_313" size="0.001" pos="0 0 0" quat="0.707107 0.517145 0.482246 0.000000"/>
+      <site name="lidar_314" size="0.001" pos="0 0 0" quat="0.707107 0.508650 0.491198 0.000000"/>
+      <site name="lidar_315" size="0.001" pos="0 0 0" quat="0.707107 0.500000 0.500000 0.000000"/>
+      <site name="lidar_316" size="0.001" pos="0 0 0" quat="0.707107 0.491198 0.508650 0.000000"/>
+      <site name="lidar_317" size="0.001" pos="0 0 0" quat="0.707107 0.482246 0.517145 0.000000"/>
+      <site name="lidar_318" size="0.001" pos="0 0 0" quat="0.707107 0.473147 0.525483 0.000000"/>
+      <site name="lidar_319" size="0.001" pos="0 0 0" quat="0.707107 0.463904 0.533660 0.000000"/>
+      <site name="lidar_320" size="0.001" pos="0 0 0" quat="0.707107 0.454519 0.541675 0.000000"/>
+      <site name="lidar_321" size="0.001" pos="0 0 0" quat="0.707107 0.444997 0.549525 0.000000"/>
+      <site name="lidar_322" size="0.001" pos="0 0 0" quat="0.707107 0.435338 0.557208 0.000000"/>
+      <site name="lidar_323" size="0.001" pos="0 0 0" quat="0.707107 0.425547 0.564721 0.000000"/>
+      <site name="lidar_324" size="0.001" pos="0 0 0" quat="0.707107 0.415627 0.572061 0.000000"/>
+      <site name="lidar_325" size="0.001" pos="0 0 0" quat="0.707107 0.405580 0.579228 0.000000"/>
+      <site name="lidar_326" size="0.001" pos="0 0 0" quat="0.707107 0.395409 0.586218 0.000000"/>
+      <site name="lidar_327" size="0.001" pos="0 0 0" quat="0.707107 0.385118 0.593030 0.000000"/>
+      <site name="lidar_328" size="0.001" pos="0 0 0" quat="0.707107 0.374710 0.599661 0.000000"/>
+      <site name="lidar_329" size="0.001" pos="0 0 0" quat="0.707107 0.364187 0.606109 0.000000"/>
+      <site name="lidar_330" size="0.001" pos="0 0 0" quat="0.707107 0.353553 0.612372 0.000000"/>
+      <site name="lidar_331" size="0.001" pos="0 0 0" quat="0.707107 0.342812 0.618450 0.000000"/>
+      <site name="lidar_332" size="0.001" pos="0 0 0" quat="0.707107 0.331967 0.624338 0.000000"/>
+      <site name="lidar_333" size="0.001" pos="0 0 0" quat="0.707107 0.321020 0.630037 0.000000"/>
+      <site name="lidar_334" size="0.001" pos="0 0 0" quat="0.707107 0.309975 0.635543 0.000000"/>
+      <site name="lidar_335" size="0.001" pos="0 0 0" quat="0.707107 0.298836 0.640856 0.000000"/>
+      <site name="lidar_336" size="0.001" pos="0 0 0" quat="0.707107 0.287606 0.645974 0.000000"/>
+      <site name="lidar_337" size="0.001" pos="0 0 0" quat="0.707107 0.276289 0.650895 0.000000"/>
+      <site name="lidar_338" size="0.001" pos="0 0 0" quat="0.707107 0.264887 0.655618 0.000000"/>
+      <site name="lidar_339" size="0.001" pos="0 0 0" quat="0.707107 0.253404 0.660141 0.000000"/>
+      <site name="lidar_340" size="0.001" pos="0 0 0" quat="0.707107 0.241845 0.664463 0.000000"/>
+      <site name="lidar_341" size="0.001" pos="0 0 0" quat="0.707107 0.230211 0.668583 0.000000"/>
+      <site name="lidar_342" size="0.001" pos="0 0 0" quat="0.707107 0.218508 0.672499 0.000000"/>
+      <site name="lidar_343" size="0.001" pos="0 0 0" quat="0.707107 0.206738 0.676210 0.000000"/>
+      <site name="lidar_344" size="0.001" pos="0 0 0" quat="0.707107 0.194905 0.679715 0.000000"/>
+      <site name="lidar_345" size="0.001" pos="0 0 0" quat="0.707107 0.183013 0.683013 0.000000"/>
+      <site name="lidar_346" size="0.001" pos="0 0 0" quat="0.707107 0.171065 0.686103 0.000000"/>
+      <site name="lidar_347" size="0.001" pos="0 0 0" quat="0.707107 0.159064 0.688984 0.000000"/>
+      <site name="lidar_348" size="0.001" pos="0 0 0" quat="0.707107 0.147016 0.691655 0.000000"/>
+      <site name="lidar_349" size="0.001" pos="0 0 0" quat="0.707107 0.134922 0.694115 0.000000"/>
+      <site name="lidar_350" size="0.001" pos="0 0 0" quat="0.707107 0.122788 0.696364 0.000000"/>
+      <site name="lidar_351" size="0.001" pos="0 0 0" quat="0.707107 0.110616 0.698401 0.000000"/>
+      <site name="lidar_352" size="0.001" pos="0 0 0" quat="0.707107 0.098410 0.700225 0.000000"/>
+      <site name="lidar_353" size="0.001" pos="0 0 0" quat="0.707107 0.086175 0.701836 0.000000"/>
+      <site name="lidar_354" size="0.001" pos="0 0 0" quat="0.707107 0.073913 0.703233 0.000000"/>
+      <site name="lidar_355" size="0.001" pos="0 0 0" quat="0.707107 0.061628 0.704416 0.000000"/>
+      <site name="lidar_356" size="0.001" pos="0 0 0" quat="0.707107 0.049325 0.705384 0.000000"/>
+      <site name="lidar_357" size="0.001" pos="0 0 0" quat="0.707107 0.037007 0.706138 0.000000"/>
+      <site name="lidar_358" size="0.001" pos="0 0 0" quat="0.707107 0.024678 0.706676 0.000000"/>
+      <site name="lidar_359" size="0.001" pos="0 0 0" quat="0.707107 0.012341 0.706999 0.000000"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- Combined thrust and moment actuation -->
+    <motor name="body_thrust" site="actuation" gear="0 0 1 0 0 0" ctrllimited="true" ctrlrange="0 0.6"/>
+    <motor name="x_moment" site="actuation" gear="0 0 0 1 0 0" ctrllimited="true" ctrlrange="-0.005 0.005"/>
+    <motor name="y_moment" site="actuation" gear="0 0 0 0 1 0" ctrllimited="true" ctrlrange="-0.005 0.005"/>
+    <motor name="z_moment" site="actuation" gear="0 0 0 0 0 1" ctrllimited="true" ctrlrange="-0.005 0.005"/>
+
+    <!-- Propeller velocity actuators (visual spinning) -->
+    <velocity name="prop_fr_vel" joint="prop_fr_joint" kv="1e-6"/>
+    <velocity name="prop_fl_vel" joint="prop_fl_joint" kv="1e-6"/>
+    <velocity name="prop_bl_vel" joint="prop_bl_joint" kv="1e-6"/>
+    <velocity name="prop_br_vel" joint="prop_br_joint" kv="1e-6"/>
+  </actuator>
+
+  <sensor>
+    <!-- IMU sensors with realistic noise -->
+    <accelerometer name="accel" site="imu" noise="0.01"/>
+    <gyro name="gyro" site="imu" noise="0.001"/>
+    <!-- Magnetometer for heading reference -->
+    <magnetometer name="mag" site="imu" noise="0.005"/>
+
+    <!-- Position and velocity sensors -->
+    <framepos name="cf2_position" objtype="body" objname="cf2"/>
+    <framequat name="cf2_orientation" objtype="body" objname="cf2"/>
+    <framelinvel name="cf2_velocity" objtype="body" objname="cf2"/>
+    <frameangvel name="cf2_angular_velocity" objtype="body" objname="cf2"/>
+
+    <!-- LIDAR rangefinders (360 rays) -->
+    <rangefinder name="lidar_0" site="lidar_0" cutoff="20"/>
+    <rangefinder name="lidar_1" site="lidar_1" cutoff="20"/>
+    <rangefinder name="lidar_2" site="lidar_2" cutoff="20"/>
+    <rangefinder name="lidar_3" site="lidar_3" cutoff="20"/>
+    <rangefinder name="lidar_4" site="lidar_4" cutoff="20"/>
+    <rangefinder name="lidar_5" site="lidar_5" cutoff="20"/>
+    <rangefinder name="lidar_6" site="lidar_6" cutoff="20"/>
+    <rangefinder name="lidar_7" site="lidar_7" cutoff="20"/>
+    <rangefinder name="lidar_8" site="lidar_8" cutoff="20"/>
+    <rangefinder name="lidar_9" site="lidar_9" cutoff="20"/>
+    <rangefinder name="lidar_10" site="lidar_10" cutoff="20"/>
+    <rangefinder name="lidar_11" site="lidar_11" cutoff="20"/>
+    <rangefinder name="lidar_12" site="lidar_12" cutoff="20"/>
+    <rangefinder name="lidar_13" site="lidar_13" cutoff="20"/>
+    <rangefinder name="lidar_14" site="lidar_14" cutoff="20"/>
+    <rangefinder name="lidar_15" site="lidar_15" cutoff="20"/>
+    <rangefinder name="lidar_16" site="lidar_16" cutoff="20"/>
+    <rangefinder name="lidar_17" site="lidar_17" cutoff="20"/>
+    <rangefinder name="lidar_18" site="lidar_18" cutoff="20"/>
+    <rangefinder name="lidar_19" site="lidar_19" cutoff="20"/>
+    <rangefinder name="lidar_20" site="lidar_20" cutoff="20"/>
+    <rangefinder name="lidar_21" site="lidar_21" cutoff="20"/>
+    <rangefinder name="lidar_22" site="lidar_22" cutoff="20"/>
+    <rangefinder name="lidar_23" site="lidar_23" cutoff="20"/>
+    <rangefinder name="lidar_24" site="lidar_24" cutoff="20"/>
+    <rangefinder name="lidar_25" site="lidar_25" cutoff="20"/>
+    <rangefinder name="lidar_26" site="lidar_26" cutoff="20"/>
+    <rangefinder name="lidar_27" site="lidar_27" cutoff="20"/>
+    <rangefinder name="lidar_28" site="lidar_28" cutoff="20"/>
+    <rangefinder name="lidar_29" site="lidar_29" cutoff="20"/>
+    <rangefinder name="lidar_30" site="lidar_30" cutoff="20"/>
+    <rangefinder name="lidar_31" site="lidar_31" cutoff="20"/>
+    <rangefinder name="lidar_32" site="lidar_32" cutoff="20"/>
+    <rangefinder name="lidar_33" site="lidar_33" cutoff="20"/>
+    <rangefinder name="lidar_34" site="lidar_34" cutoff="20"/>
+    <rangefinder name="lidar_35" site="lidar_35" cutoff="20"/>
+    <rangefinder name="lidar_36" site="lidar_36" cutoff="20"/>
+    <rangefinder name="lidar_37" site="lidar_37" cutoff="20"/>
+    <rangefinder name="lidar_38" site="lidar_38" cutoff="20"/>
+    <rangefinder name="lidar_39" site="lidar_39" cutoff="20"/>
+    <rangefinder name="lidar_40" site="lidar_40" cutoff="20"/>
+    <rangefinder name="lidar_41" site="lidar_41" cutoff="20"/>
+    <rangefinder name="lidar_42" site="lidar_42" cutoff="20"/>
+    <rangefinder name="lidar_43" site="lidar_43" cutoff="20"/>
+    <rangefinder name="lidar_44" site="lidar_44" cutoff="20"/>
+    <rangefinder name="lidar_45" site="lidar_45" cutoff="20"/>
+    <rangefinder name="lidar_46" site="lidar_46" cutoff="20"/>
+    <rangefinder name="lidar_47" site="lidar_47" cutoff="20"/>
+    <rangefinder name="lidar_48" site="lidar_48" cutoff="20"/>
+    <rangefinder name="lidar_49" site="lidar_49" cutoff="20"/>
+    <rangefinder name="lidar_50" site="lidar_50" cutoff="20"/>
+    <rangefinder name="lidar_51" site="lidar_51" cutoff="20"/>
+    <rangefinder name="lidar_52" site="lidar_52" cutoff="20"/>
+    <rangefinder name="lidar_53" site="lidar_53" cutoff="20"/>
+    <rangefinder name="lidar_54" site="lidar_54" cutoff="20"/>
+    <rangefinder name="lidar_55" site="lidar_55" cutoff="20"/>
+    <rangefinder name="lidar_56" site="lidar_56" cutoff="20"/>
+    <rangefinder name="lidar_57" site="lidar_57" cutoff="20"/>
+    <rangefinder name="lidar_58" site="lidar_58" cutoff="20"/>
+    <rangefinder name="lidar_59" site="lidar_59" cutoff="20"/>
+    <rangefinder name="lidar_60" site="lidar_60" cutoff="20"/>
+    <rangefinder name="lidar_61" site="lidar_61" cutoff="20"/>
+    <rangefinder name="lidar_62" site="lidar_62" cutoff="20"/>
+    <rangefinder name="lidar_63" site="lidar_63" cutoff="20"/>
+    <rangefinder name="lidar_64" site="lidar_64" cutoff="20"/>
+    <rangefinder name="lidar_65" site="lidar_65" cutoff="20"/>
+    <rangefinder name="lidar_66" site="lidar_66" cutoff="20"/>
+    <rangefinder name="lidar_67" site="lidar_67" cutoff="20"/>
+    <rangefinder name="lidar_68" site="lidar_68" cutoff="20"/>
+    <rangefinder name="lidar_69" site="lidar_69" cutoff="20"/>
+    <rangefinder name="lidar_70" site="lidar_70" cutoff="20"/>
+    <rangefinder name="lidar_71" site="lidar_71" cutoff="20"/>
+    <rangefinder name="lidar_72" site="lidar_72" cutoff="20"/>
+    <rangefinder name="lidar_73" site="lidar_73" cutoff="20"/>
+    <rangefinder name="lidar_74" site="lidar_74" cutoff="20"/>
+    <rangefinder name="lidar_75" site="lidar_75" cutoff="20"/>
+    <rangefinder name="lidar_76" site="lidar_76" cutoff="20"/>
+    <rangefinder name="lidar_77" site="lidar_77" cutoff="20"/>
+    <rangefinder name="lidar_78" site="lidar_78" cutoff="20"/>
+    <rangefinder name="lidar_79" site="lidar_79" cutoff="20"/>
+    <rangefinder name="lidar_80" site="lidar_80" cutoff="20"/>
+    <rangefinder name="lidar_81" site="lidar_81" cutoff="20"/>
+    <rangefinder name="lidar_82" site="lidar_82" cutoff="20"/>
+    <rangefinder name="lidar_83" site="lidar_83" cutoff="20"/>
+    <rangefinder name="lidar_84" site="lidar_84" cutoff="20"/>
+    <rangefinder name="lidar_85" site="lidar_85" cutoff="20"/>
+    <rangefinder name="lidar_86" site="lidar_86" cutoff="20"/>
+    <rangefinder name="lidar_87" site="lidar_87" cutoff="20"/>
+    <rangefinder name="lidar_88" site="lidar_88" cutoff="20"/>
+    <rangefinder name="lidar_89" site="lidar_89" cutoff="20"/>
+    <rangefinder name="lidar_90" site="lidar_90" cutoff="20"/>
+    <rangefinder name="lidar_91" site="lidar_91" cutoff="20"/>
+    <rangefinder name="lidar_92" site="lidar_92" cutoff="20"/>
+    <rangefinder name="lidar_93" site="lidar_93" cutoff="20"/>
+    <rangefinder name="lidar_94" site="lidar_94" cutoff="20"/>
+    <rangefinder name="lidar_95" site="lidar_95" cutoff="20"/>
+    <rangefinder name="lidar_96" site="lidar_96" cutoff="20"/>
+    <rangefinder name="lidar_97" site="lidar_97" cutoff="20"/>
+    <rangefinder name="lidar_98" site="lidar_98" cutoff="20"/>
+    <rangefinder name="lidar_99" site="lidar_99" cutoff="20"/>
+    <rangefinder name="lidar_100" site="lidar_100" cutoff="20"/>
+    <rangefinder name="lidar_101" site="lidar_101" cutoff="20"/>
+    <rangefinder name="lidar_102" site="lidar_102" cutoff="20"/>
+    <rangefinder name="lidar_103" site="lidar_103" cutoff="20"/>
+    <rangefinder name="lidar_104" site="lidar_104" cutoff="20"/>
+    <rangefinder name="lidar_105" site="lidar_105" cutoff="20"/>
+    <rangefinder name="lidar_106" site="lidar_106" cutoff="20"/>
+    <rangefinder name="lidar_107" site="lidar_107" cutoff="20"/>
+    <rangefinder name="lidar_108" site="lidar_108" cutoff="20"/>
+    <rangefinder name="lidar_109" site="lidar_109" cutoff="20"/>
+    <rangefinder name="lidar_110" site="lidar_110" cutoff="20"/>
+    <rangefinder name="lidar_111" site="lidar_111" cutoff="20"/>
+    <rangefinder name="lidar_112" site="lidar_112" cutoff="20"/>
+    <rangefinder name="lidar_113" site="lidar_113" cutoff="20"/>
+    <rangefinder name="lidar_114" site="lidar_114" cutoff="20"/>
+    <rangefinder name="lidar_115" site="lidar_115" cutoff="20"/>
+    <rangefinder name="lidar_116" site="lidar_116" cutoff="20"/>
+    <rangefinder name="lidar_117" site="lidar_117" cutoff="20"/>
+    <rangefinder name="lidar_118" site="lidar_118" cutoff="20"/>
+    <rangefinder name="lidar_119" site="lidar_119" cutoff="20"/>
+    <rangefinder name="lidar_120" site="lidar_120" cutoff="20"/>
+    <rangefinder name="lidar_121" site="lidar_121" cutoff="20"/>
+    <rangefinder name="lidar_122" site="lidar_122" cutoff="20"/>
+    <rangefinder name="lidar_123" site="lidar_123" cutoff="20"/>
+    <rangefinder name="lidar_124" site="lidar_124" cutoff="20"/>
+    <rangefinder name="lidar_125" site="lidar_125" cutoff="20"/>
+    <rangefinder name="lidar_126" site="lidar_126" cutoff="20"/>
+    <rangefinder name="lidar_127" site="lidar_127" cutoff="20"/>
+    <rangefinder name="lidar_128" site="lidar_128" cutoff="20"/>
+    <rangefinder name="lidar_129" site="lidar_129" cutoff="20"/>
+    <rangefinder name="lidar_130" site="lidar_130" cutoff="20"/>
+    <rangefinder name="lidar_131" site="lidar_131" cutoff="20"/>
+    <rangefinder name="lidar_132" site="lidar_132" cutoff="20"/>
+    <rangefinder name="lidar_133" site="lidar_133" cutoff="20"/>
+    <rangefinder name="lidar_134" site="lidar_134" cutoff="20"/>
+    <rangefinder name="lidar_135" site="lidar_135" cutoff="20"/>
+    <rangefinder name="lidar_136" site="lidar_136" cutoff="20"/>
+    <rangefinder name="lidar_137" site="lidar_137" cutoff="20"/>
+    <rangefinder name="lidar_138" site="lidar_138" cutoff="20"/>
+    <rangefinder name="lidar_139" site="lidar_139" cutoff="20"/>
+    <rangefinder name="lidar_140" site="lidar_140" cutoff="20"/>
+    <rangefinder name="lidar_141" site="lidar_141" cutoff="20"/>
+    <rangefinder name="lidar_142" site="lidar_142" cutoff="20"/>
+    <rangefinder name="lidar_143" site="lidar_143" cutoff="20"/>
+    <rangefinder name="lidar_144" site="lidar_144" cutoff="20"/>
+    <rangefinder name="lidar_145" site="lidar_145" cutoff="20"/>
+    <rangefinder name="lidar_146" site="lidar_146" cutoff="20"/>
+    <rangefinder name="lidar_147" site="lidar_147" cutoff="20"/>
+    <rangefinder name="lidar_148" site="lidar_148" cutoff="20"/>
+    <rangefinder name="lidar_149" site="lidar_149" cutoff="20"/>
+    <rangefinder name="lidar_150" site="lidar_150" cutoff="20"/>
+    <rangefinder name="lidar_151" site="lidar_151" cutoff="20"/>
+    <rangefinder name="lidar_152" site="lidar_152" cutoff="20"/>
+    <rangefinder name="lidar_153" site="lidar_153" cutoff="20"/>
+    <rangefinder name="lidar_154" site="lidar_154" cutoff="20"/>
+    <rangefinder name="lidar_155" site="lidar_155" cutoff="20"/>
+    <rangefinder name="lidar_156" site="lidar_156" cutoff="20"/>
+    <rangefinder name="lidar_157" site="lidar_157" cutoff="20"/>
+    <rangefinder name="lidar_158" site="lidar_158" cutoff="20"/>
+    <rangefinder name="lidar_159" site="lidar_159" cutoff="20"/>
+    <rangefinder name="lidar_160" site="lidar_160" cutoff="20"/>
+    <rangefinder name="lidar_161" site="lidar_161" cutoff="20"/>
+    <rangefinder name="lidar_162" site="lidar_162" cutoff="20"/>
+    <rangefinder name="lidar_163" site="lidar_163" cutoff="20"/>
+    <rangefinder name="lidar_164" site="lidar_164" cutoff="20"/>
+    <rangefinder name="lidar_165" site="lidar_165" cutoff="20"/>
+    <rangefinder name="lidar_166" site="lidar_166" cutoff="20"/>
+    <rangefinder name="lidar_167" site="lidar_167" cutoff="20"/>
+    <rangefinder name="lidar_168" site="lidar_168" cutoff="20"/>
+    <rangefinder name="lidar_169" site="lidar_169" cutoff="20"/>
+    <rangefinder name="lidar_170" site="lidar_170" cutoff="20"/>
+    <rangefinder name="lidar_171" site="lidar_171" cutoff="20"/>
+    <rangefinder name="lidar_172" site="lidar_172" cutoff="20"/>
+    <rangefinder name="lidar_173" site="lidar_173" cutoff="20"/>
+    <rangefinder name="lidar_174" site="lidar_174" cutoff="20"/>
+    <rangefinder name="lidar_175" site="lidar_175" cutoff="20"/>
+    <rangefinder name="lidar_176" site="lidar_176" cutoff="20"/>
+    <rangefinder name="lidar_177" site="lidar_177" cutoff="20"/>
+    <rangefinder name="lidar_178" site="lidar_178" cutoff="20"/>
+    <rangefinder name="lidar_179" site="lidar_179" cutoff="20"/>
+    <rangefinder name="lidar_180" site="lidar_180" cutoff="20"/>
+    <rangefinder name="lidar_181" site="lidar_181" cutoff="20"/>
+    <rangefinder name="lidar_182" site="lidar_182" cutoff="20"/>
+    <rangefinder name="lidar_183" site="lidar_183" cutoff="20"/>
+    <rangefinder name="lidar_184" site="lidar_184" cutoff="20"/>
+    <rangefinder name="lidar_185" site="lidar_185" cutoff="20"/>
+    <rangefinder name="lidar_186" site="lidar_186" cutoff="20"/>
+    <rangefinder name="lidar_187" site="lidar_187" cutoff="20"/>
+    <rangefinder name="lidar_188" site="lidar_188" cutoff="20"/>
+    <rangefinder name="lidar_189" site="lidar_189" cutoff="20"/>
+    <rangefinder name="lidar_190" site="lidar_190" cutoff="20"/>
+    <rangefinder name="lidar_191" site="lidar_191" cutoff="20"/>
+    <rangefinder name="lidar_192" site="lidar_192" cutoff="20"/>
+    <rangefinder name="lidar_193" site="lidar_193" cutoff="20"/>
+    <rangefinder name="lidar_194" site="lidar_194" cutoff="20"/>
+    <rangefinder name="lidar_195" site="lidar_195" cutoff="20"/>
+    <rangefinder name="lidar_196" site="lidar_196" cutoff="20"/>
+    <rangefinder name="lidar_197" site="lidar_197" cutoff="20"/>
+    <rangefinder name="lidar_198" site="lidar_198" cutoff="20"/>
+    <rangefinder name="lidar_199" site="lidar_199" cutoff="20"/>
+    <rangefinder name="lidar_200" site="lidar_200" cutoff="20"/>
+    <rangefinder name="lidar_201" site="lidar_201" cutoff="20"/>
+    <rangefinder name="lidar_202" site="lidar_202" cutoff="20"/>
+    <rangefinder name="lidar_203" site="lidar_203" cutoff="20"/>
+    <rangefinder name="lidar_204" site="lidar_204" cutoff="20"/>
+    <rangefinder name="lidar_205" site="lidar_205" cutoff="20"/>
+    <rangefinder name="lidar_206" site="lidar_206" cutoff="20"/>
+    <rangefinder name="lidar_207" site="lidar_207" cutoff="20"/>
+    <rangefinder name="lidar_208" site="lidar_208" cutoff="20"/>
+    <rangefinder name="lidar_209" site="lidar_209" cutoff="20"/>
+    <rangefinder name="lidar_210" site="lidar_210" cutoff="20"/>
+    <rangefinder name="lidar_211" site="lidar_211" cutoff="20"/>
+    <rangefinder name="lidar_212" site="lidar_212" cutoff="20"/>
+    <rangefinder name="lidar_213" site="lidar_213" cutoff="20"/>
+    <rangefinder name="lidar_214" site="lidar_214" cutoff="20"/>
+    <rangefinder name="lidar_215" site="lidar_215" cutoff="20"/>
+    <rangefinder name="lidar_216" site="lidar_216" cutoff="20"/>
+    <rangefinder name="lidar_217" site="lidar_217" cutoff="20"/>
+    <rangefinder name="lidar_218" site="lidar_218" cutoff="20"/>
+    <rangefinder name="lidar_219" site="lidar_219" cutoff="20"/>
+    <rangefinder name="lidar_220" site="lidar_220" cutoff="20"/>
+    <rangefinder name="lidar_221" site="lidar_221" cutoff="20"/>
+    <rangefinder name="lidar_222" site="lidar_222" cutoff="20"/>
+    <rangefinder name="lidar_223" site="lidar_223" cutoff="20"/>
+    <rangefinder name="lidar_224" site="lidar_224" cutoff="20"/>
+    <rangefinder name="lidar_225" site="lidar_225" cutoff="20"/>
+    <rangefinder name="lidar_226" site="lidar_226" cutoff="20"/>
+    <rangefinder name="lidar_227" site="lidar_227" cutoff="20"/>
+    <rangefinder name="lidar_228" site="lidar_228" cutoff="20"/>
+    <rangefinder name="lidar_229" site="lidar_229" cutoff="20"/>
+    <rangefinder name="lidar_230" site="lidar_230" cutoff="20"/>
+    <rangefinder name="lidar_231" site="lidar_231" cutoff="20"/>
+    <rangefinder name="lidar_232" site="lidar_232" cutoff="20"/>
+    <rangefinder name="lidar_233" site="lidar_233" cutoff="20"/>
+    <rangefinder name="lidar_234" site="lidar_234" cutoff="20"/>
+    <rangefinder name="lidar_235" site="lidar_235" cutoff="20"/>
+    <rangefinder name="lidar_236" site="lidar_236" cutoff="20"/>
+    <rangefinder name="lidar_237" site="lidar_237" cutoff="20"/>
+    <rangefinder name="lidar_238" site="lidar_238" cutoff="20"/>
+    <rangefinder name="lidar_239" site="lidar_239" cutoff="20"/>
+    <rangefinder name="lidar_240" site="lidar_240" cutoff="20"/>
+    <rangefinder name="lidar_241" site="lidar_241" cutoff="20"/>
+    <rangefinder name="lidar_242" site="lidar_242" cutoff="20"/>
+    <rangefinder name="lidar_243" site="lidar_243" cutoff="20"/>
+    <rangefinder name="lidar_244" site="lidar_244" cutoff="20"/>
+    <rangefinder name="lidar_245" site="lidar_245" cutoff="20"/>
+    <rangefinder name="lidar_246" site="lidar_246" cutoff="20"/>
+    <rangefinder name="lidar_247" site="lidar_247" cutoff="20"/>
+    <rangefinder name="lidar_248" site="lidar_248" cutoff="20"/>
+    <rangefinder name="lidar_249" site="lidar_249" cutoff="20"/>
+    <rangefinder name="lidar_250" site="lidar_250" cutoff="20"/>
+    <rangefinder name="lidar_251" site="lidar_251" cutoff="20"/>
+    <rangefinder name="lidar_252" site="lidar_252" cutoff="20"/>
+    <rangefinder name="lidar_253" site="lidar_253" cutoff="20"/>
+    <rangefinder name="lidar_254" site="lidar_254" cutoff="20"/>
+    <rangefinder name="lidar_255" site="lidar_255" cutoff="20"/>
+    <rangefinder name="lidar_256" site="lidar_256" cutoff="20"/>
+    <rangefinder name="lidar_257" site="lidar_257" cutoff="20"/>
+    <rangefinder name="lidar_258" site="lidar_258" cutoff="20"/>
+    <rangefinder name="lidar_259" site="lidar_259" cutoff="20"/>
+    <rangefinder name="lidar_260" site="lidar_260" cutoff="20"/>
+    <rangefinder name="lidar_261" site="lidar_261" cutoff="20"/>
+    <rangefinder name="lidar_262" site="lidar_262" cutoff="20"/>
+    <rangefinder name="lidar_263" site="lidar_263" cutoff="20"/>
+    <rangefinder name="lidar_264" site="lidar_264" cutoff="20"/>
+    <rangefinder name="lidar_265" site="lidar_265" cutoff="20"/>
+    <rangefinder name="lidar_266" site="lidar_266" cutoff="20"/>
+    <rangefinder name="lidar_267" site="lidar_267" cutoff="20"/>
+    <rangefinder name="lidar_268" site="lidar_268" cutoff="20"/>
+    <rangefinder name="lidar_269" site="lidar_269" cutoff="20"/>
+    <rangefinder name="lidar_270" site="lidar_270" cutoff="20"/>
+    <rangefinder name="lidar_271" site="lidar_271" cutoff="20"/>
+    <rangefinder name="lidar_272" site="lidar_272" cutoff="20"/>
+    <rangefinder name="lidar_273" site="lidar_273" cutoff="20"/>
+    <rangefinder name="lidar_274" site="lidar_274" cutoff="20"/>
+    <rangefinder name="lidar_275" site="lidar_275" cutoff="20"/>
+    <rangefinder name="lidar_276" site="lidar_276" cutoff="20"/>
+    <rangefinder name="lidar_277" site="lidar_277" cutoff="20"/>
+    <rangefinder name="lidar_278" site="lidar_278" cutoff="20"/>
+    <rangefinder name="lidar_279" site="lidar_279" cutoff="20"/>
+    <rangefinder name="lidar_280" site="lidar_280" cutoff="20"/>
+    <rangefinder name="lidar_281" site="lidar_281" cutoff="20"/>
+    <rangefinder name="lidar_282" site="lidar_282" cutoff="20"/>
+    <rangefinder name="lidar_283" site="lidar_283" cutoff="20"/>
+    <rangefinder name="lidar_284" site="lidar_284" cutoff="20"/>
+    <rangefinder name="lidar_285" site="lidar_285" cutoff="20"/>
+    <rangefinder name="lidar_286" site="lidar_286" cutoff="20"/>
+    <rangefinder name="lidar_287" site="lidar_287" cutoff="20"/>
+    <rangefinder name="lidar_288" site="lidar_288" cutoff="20"/>
+    <rangefinder name="lidar_289" site="lidar_289" cutoff="20"/>
+    <rangefinder name="lidar_290" site="lidar_290" cutoff="20"/>
+    <rangefinder name="lidar_291" site="lidar_291" cutoff="20"/>
+    <rangefinder name="lidar_292" site="lidar_292" cutoff="20"/>
+    <rangefinder name="lidar_293" site="lidar_293" cutoff="20"/>
+    <rangefinder name="lidar_294" site="lidar_294" cutoff="20"/>
+    <rangefinder name="lidar_295" site="lidar_295" cutoff="20"/>
+    <rangefinder name="lidar_296" site="lidar_296" cutoff="20"/>
+    <rangefinder name="lidar_297" site="lidar_297" cutoff="20"/>
+    <rangefinder name="lidar_298" site="lidar_298" cutoff="20"/>
+    <rangefinder name="lidar_299" site="lidar_299" cutoff="20"/>
+    <rangefinder name="lidar_300" site="lidar_300" cutoff="20"/>
+    <rangefinder name="lidar_301" site="lidar_301" cutoff="20"/>
+    <rangefinder name="lidar_302" site="lidar_302" cutoff="20"/>
+    <rangefinder name="lidar_303" site="lidar_303" cutoff="20"/>
+    <rangefinder name="lidar_304" site="lidar_304" cutoff="20"/>
+    <rangefinder name="lidar_305" site="lidar_305" cutoff="20"/>
+    <rangefinder name="lidar_306" site="lidar_306" cutoff="20"/>
+    <rangefinder name="lidar_307" site="lidar_307" cutoff="20"/>
+    <rangefinder name="lidar_308" site="lidar_308" cutoff="20"/>
+    <rangefinder name="lidar_309" site="lidar_309" cutoff="20"/>
+    <rangefinder name="lidar_310" site="lidar_310" cutoff="20"/>
+    <rangefinder name="lidar_311" site="lidar_311" cutoff="20"/>
+    <rangefinder name="lidar_312" site="lidar_312" cutoff="20"/>
+    <rangefinder name="lidar_313" site="lidar_313" cutoff="20"/>
+    <rangefinder name="lidar_314" site="lidar_314" cutoff="20"/>
+    <rangefinder name="lidar_315" site="lidar_315" cutoff="20"/>
+    <rangefinder name="lidar_316" site="lidar_316" cutoff="20"/>
+    <rangefinder name="lidar_317" site="lidar_317" cutoff="20"/>
+    <rangefinder name="lidar_318" site="lidar_318" cutoff="20"/>
+    <rangefinder name="lidar_319" site="lidar_319" cutoff="20"/>
+    <rangefinder name="lidar_320" site="lidar_320" cutoff="20"/>
+    <rangefinder name="lidar_321" site="lidar_321" cutoff="20"/>
+    <rangefinder name="lidar_322" site="lidar_322" cutoff="20"/>
+    <rangefinder name="lidar_323" site="lidar_323" cutoff="20"/>
+    <rangefinder name="lidar_324" site="lidar_324" cutoff="20"/>
+    <rangefinder name="lidar_325" site="lidar_325" cutoff="20"/>
+    <rangefinder name="lidar_326" site="lidar_326" cutoff="20"/>
+    <rangefinder name="lidar_327" site="lidar_327" cutoff="20"/>
+    <rangefinder name="lidar_328" site="lidar_328" cutoff="20"/>
+    <rangefinder name="lidar_329" site="lidar_329" cutoff="20"/>
+    <rangefinder name="lidar_330" site="lidar_330" cutoff="20"/>
+    <rangefinder name="lidar_331" site="lidar_331" cutoff="20"/>
+    <rangefinder name="lidar_332" site="lidar_332" cutoff="20"/>
+    <rangefinder name="lidar_333" site="lidar_333" cutoff="20"/>
+    <rangefinder name="lidar_334" site="lidar_334" cutoff="20"/>
+    <rangefinder name="lidar_335" site="lidar_335" cutoff="20"/>
+    <rangefinder name="lidar_336" site="lidar_336" cutoff="20"/>
+    <rangefinder name="lidar_337" site="lidar_337" cutoff="20"/>
+    <rangefinder name="lidar_338" site="lidar_338" cutoff="20"/>
+    <rangefinder name="lidar_339" site="lidar_339" cutoff="20"/>
+    <rangefinder name="lidar_340" site="lidar_340" cutoff="20"/>
+    <rangefinder name="lidar_341" site="lidar_341" cutoff="20"/>
+    <rangefinder name="lidar_342" site="lidar_342" cutoff="20"/>
+    <rangefinder name="lidar_343" site="lidar_343" cutoff="20"/>
+    <rangefinder name="lidar_344" site="lidar_344" cutoff="20"/>
+    <rangefinder name="lidar_345" site="lidar_345" cutoff="20"/>
+    <rangefinder name="lidar_346" site="lidar_346" cutoff="20"/>
+    <rangefinder name="lidar_347" site="lidar_347" cutoff="20"/>
+    <rangefinder name="lidar_348" site="lidar_348" cutoff="20"/>
+    <rangefinder name="lidar_349" site="lidar_349" cutoff="20"/>
+    <rangefinder name="lidar_350" site="lidar_350" cutoff="20"/>
+    <rangefinder name="lidar_351" site="lidar_351" cutoff="20"/>
+    <rangefinder name="lidar_352" site="lidar_352" cutoff="20"/>
+    <rangefinder name="lidar_353" site="lidar_353" cutoff="20"/>
+    <rangefinder name="lidar_354" site="lidar_354" cutoff="20"/>
+    <rangefinder name="lidar_355" site="lidar_355" cutoff="20"/>
+    <rangefinder name="lidar_356" site="lidar_356" cutoff="20"/>
+    <rangefinder name="lidar_357" site="lidar_357" cutoff="20"/>
+    <rangefinder name="lidar_358" site="lidar_358" cutoff="20"/>
+    <rangefinder name="lidar_359" site="lidar_359" cutoff="20"/>
+  </sensor>
+</mujoco>

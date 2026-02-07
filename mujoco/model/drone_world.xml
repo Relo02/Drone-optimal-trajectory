@@ -1,0 +1,86 @@
+<mujoco model="cf2_obstacle_world">
+  <!-- Include the Crazyflie 2 drone model with lidar -->
+  <include file="cf2.xml"/>
+
+  <compiler angle="degree"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81"
+          density="1.225" viscosity="1.81e-5" wind="0 0 0">
+    <!-- density: air density at sea level (kg/m³) -->
+    <!-- viscosity: dynamic viscosity of air at 20°C (Pa·s) -->
+    <!-- wind: global wind velocity (modify for turbulence simulation) -->
+    <flag warmstart="enable"/>
+  </option>
+
+  <statistic center="5 0 1" extent="15" meansize="0.5"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <!-- Ground textures -->
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512"
+      rgb1="0.2 0.3 0.2" rgb2="0.1 0.2 0.1"/>
+    <material name="grid" texture="grid" texrepeat="10 10" reflectance="0.1"/>
+
+    <!-- Skybox -->
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7"
+      rgb2="0.0 0.0 0.0" width="800" height="800"/>
+
+    <!-- Obstacle materials -->
+    <material name="obstacle_red" rgba="0.8 0.2 0.2 1"/>
+    <material name="obstacle_orange" rgba="0.9 0.5 0.1 1"/>
+    <material name="obstacle_gray" rgba="0.5 0.5 0.5 1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Lighting -->
+    <light directional="true" pos="0 0 10" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <light directional="true" pos="5 5 10" dir="-1 -1 -2" diffuse="0.4 0.4 0.4"/>
+
+    <!-- Ground Plane -->
+    <geom name="ground" type="plane" size="20 20 0.1" material="grid" condim="3" friction="1 0.005 0.0001"/>
+
+    <!-- Cylindrical Obstacles -->
+    <body name="obstacle1" pos="3 0 1">
+      <geom type="cylinder" size="0.3 1" material="obstacle_red" mass="100"/>
+    </body>
+
+    <body name="obstacle2" pos="6 2 1.5">
+      <geom type="cylinder" size="0.25 1.5" material="obstacle_red" mass="100"/>
+    </body>
+
+    <body name="obstacle3" pos="6 -2 0.75">
+      <geom type="cylinder" size="0.35 0.75" material="obstacle_red" mass="100"/>
+    </body>
+
+    <body name="obstacle4" pos="9 0 1.2">
+      <geom type="cylinder" size="0.3 1.2" material="obstacle_orange" mass="100"/>
+    </body>
+
+    <body name="obstacle5" pos="12 3 1">
+      <geom type="cylinder" size="0.25 1" material="obstacle_orange" mass="100"/>
+    </body>
+
+    <body name="obstacle6" pos="12 -3 1.3">
+      <geom type="cylinder" size="0.3 1.3" material="obstacle_orange" mass="100"/>
+    </body>
+
+    <!-- Box Obstacles -->
+    <body name="box_obstacle1" pos="4.5 -3 0.5">
+      <geom type="box" size="0.5 0.5 0.5" material="obstacle_gray" mass="100"/>
+    </body>
+
+    <body name="box_obstacle2" pos="8 4 0.6">
+      <geom type="box" size="0.6 0.4 0.6" material="obstacle_gray" mass="100"/>
+    </body>
+
+    <!-- Goal marker (optional visual indicator) -->
+    <body name="goal" pos="15 0 1">
+      <geom type="sphere" size="0.2" rgba="0 1 0 0.5" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+</mujoco>

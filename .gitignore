@@ -5,3 +5,7 @@ drone_ws/install/
 drone_ws/log/
 drone_ws/src/drone/scripts/PubSubTopics
 QGC/*.AppImage
+mujoco/myenv
+mujoco/ros2_ws/build/
+mujoco/ros2_ws/install/
+mujoco/ros2_ws/log/
