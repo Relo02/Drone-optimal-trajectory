@@ -358,10 +358,10 @@ class AStarLocalPlanner:
 
     def draw_path(self, ax=None):
         """Draw the planned path on a matplotlib axes."""
-        import matplotlib.pyplot as plt
-
         if self.path_world is None:
             return None
+
+        import matplotlib.pyplot as plt
 
         if ax is None:
             fig, ax = plt.subplots()

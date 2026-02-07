@@ -104,8 +104,8 @@ class MujocoSimNode(Node):
         super().__init__('mujoco_sim')
 
         # Declare parameters
-        self.declare_parameter('goal_x', 5.0)
-        self.declare_parameter('goal_y', 5.0)
+        self.declare_parameter('goal_x', 10.0)
+        self.declare_parameter('goal_y', 1.0)
         self.declare_parameter('goal_z', 1.5)
         self.declare_parameter('publish_rate', 50.0)
 
@@ -304,7 +304,7 @@ def main():
         log_interval = 10  # Log every N steps
         ros_publish_interval = int(500 / ros_node.publish_rate)  # Publish at configured rate
 
-        # Publish initial goal to trigger A* planning
+        # Publish initial goal to trigger A* planning (global goal)
         ros_node.publish_goal()
 
         while viewer.is_running():

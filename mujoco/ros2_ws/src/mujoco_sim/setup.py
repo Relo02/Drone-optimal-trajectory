@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'a_star_planner_node = mujoco_sim.a_star_planner_node:main',
             'mujoco_sim_node = mujoco_sim.main:main',
+            'pointcloud_visualizer_node = mujoco_sim.visualize_pointcloud:main',
         ],
     },
 )

@@ -21,13 +21,13 @@ def generate_launch_description():
     # Declare launch arguments
     goal_x_arg = DeclareLaunchArgument(
         'goal_x',
-        default_value='5.0',
+        default_value='10.0',
         description='Goal X position'
     )
 
     goal_y_arg = DeclareLaunchArgument(
         'goal_y',
-        default_value='5.0',
+        default_value='1.0',
         description='Goal Y position'
     )
 
@@ -57,7 +57,7 @@ def generate_launch_description():
 
     obstacle_cost_weight_arg = DeclareLaunchArgument(
         'obstacle_cost_weight',
-        default_value='10.0',
+        default_value='600.0',
         description='Weight for obstacle probability in path cost'
     )
 
