@@ -82,11 +82,11 @@ Where:
 
 The traversal cost for moving to a cell incorporates obstacle probability:
 
-$$\text{cell\_cost} = 1.0 + w \times P(\text{obstacle})$$
+$$\text{J_{cell}} = 1.0 + w \times P(\text{obstacle})$$
 
-$$\text{move\_cost} = \text{distance} \times \text{cell\_cost}$$
+$$\text{J_{move}} = \text{d} \times \text{J_{cell}}$$
 
-Where $w$ = `obstacle_cost_weight`
+Where $w$ = `obstacle_cost_weight` and $d$ = `distance` 
 
 ```mermaid
 graph LR
