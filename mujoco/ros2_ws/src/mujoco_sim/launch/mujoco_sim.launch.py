@@ -21,7 +21,7 @@ def generate_launch_description():
     # Declare launch arguments
     goal_x_arg = DeclareLaunchArgument(
         'goal_x',
-        default_value='10.0',
+        default_value='12.0',
         description='Goal X position'
     )
 

@@ -27,7 +27,16 @@ from nav_msgs.msg import Path
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs_py import point_cloud2
 
-from mujoco_sim.controllers import DroneController, TrajectoryTracker
+from mujoco_sim.controllers import DroneController, TrajectoryTracker, MPCDroneController
+try:
+    from mujoco_sim.MPC import MPCConfig as _MPCConfig
+except ImportError:
+    _MPCConfig = None
+try:
+    from mujoco_sim.new_mpc import NewMPCDroneController, NewMPCConfig
+    _NEW_MPC_AVAILABLE = True
+except ImportError:
+    _NEW_MPC_AVAILABLE = False
 from mujoco_sim.flight_logger import FlightLogger
 
 
@@ -225,6 +234,7 @@ class MujocoSimNode(Node):
         self.goal_pub.publish(msg)
 
 
+
 def main():
     # Initialize ROS2
     rclpy.init()
@@ -245,6 +255,7 @@ def main():
         if not _cleanup_done:
             _cleanup_done = True
             print("\nSaving flight logs...")
+            mpc_controller.stop()   # stop background MPC thread first
             flight_logger.finalize(trajectory_completed=False)
             print(f"Logs saved to: {flight_logger.log_dir}")
             ros_node.destroy_node()
@@ -259,20 +270,36 @@ def main():
     atexit.register(cleanup_handler)
 
     # Initialize controller
-    controller = DroneController(model, data)
-    tracker = TrajectoryTracker(controller)
+    # controller = DroneController(model, data)           # PID position controller (commented out)
+    # tracker = TrajectoryTracker(controller)             # PID trajectory tracker  (commented out)
 
-    # Connect ROS node to trajectory tracker
+    # ── MPC controller (NewMPCDroneController: A* waypoint tracking + hard wall constraints) ──
+    # N=15, dt=0.15 s → 2.25 s horizon, ~120 NLP variables per solve → ≈100 ms IPOPT solve.
+    # Waypoint sequencer advances the goal automatically as the drone reaches each A* waypoint.
+    if not _NEW_MPC_AVAILABLE:
+        raise ImportError(
+            "new_mpc.py not available. Ensure casadi is installed and "
+            "mujoco_sim.new_mpc is on the Python path."
+        )
+    new_cfg = NewMPCConfig(N=10, dt=0.2, max_iter=100)
+    mpc_controller = NewMPCDroneController(model, data, mpc_config=new_cfg)
+    mpc_controller.set_target_altitude(ros_node.goal_z)
+
+    # Thin adapter: exposes set_trajectory() so MujocoSimNode.path_callback
+    # can drive mpc_controller.set_path() without modification.
+    class _PathAdapter:
+        def set_trajectory(self, waypoints):
+            mpc_controller.set_path(waypoints)
+    tracker = _PathAdapter()
+
+    # Start background MPC solver thread (decoupled from MuJoCo 500 Hz loop)
+    mpc_controller.start()
+
+    # Connect ROS node to path adapter
     ros_node.set_trajectory_tracker(tracker)
 
-    # Set initial fallback trajectory (will be replaced by A* path)
-    initial_trajectory = [
-        [0, 0, 1.5],  # Hover at start
-    ]
-    tracker.set_trajectory(initial_trajectory)
-
-    # Log trajectory to flight logger
-    flight_logger.set_trajectory(initial_trajectory)
+    # Log a placeholder trajectory until A* path arrives
+    flight_logger.set_trajectory([[0, 0, ros_node.goal_z]])
     flight_logger.log_event("Simulation started - waiting for A* path")
 
     # Print info
@@ -280,7 +307,8 @@ def main():
     print(f"Drone mass: 0.027 kg")
     print(f"Lidar rays: {NUM_LIDAR_RAYS}")
     print()
-    print("Controller: Cascaded PD (Position -> Attitude -> Moments)")
+    # print("Controller: Cascaded PD (Position -> Attitude -> Moments)")  # PID
+    print("Controller: MPC (CasADi/IPOPT) + Attitude PD + Altitude PD")
     print(f"Goal position: ({ros_node.goal_x}, {ros_node.goal_y}, {ros_node.goal_z})")
     print()
     print("ROS2 Topics:")
@@ -301,8 +329,10 @@ def main():
     with mujoco.viewer.launch_passive(model, data) as viewer:
         step = 0
         prev_waypoint_idx = 0
-        log_interval = 10  # Log every N steps
+        log_interval = 10        # Log state every N steps (50 Hz at 500 Hz sim)
+        mpc_pred_interval = 250  # Log MPC prediction every N steps (~0.5 s)
         ros_publish_interval = int(500 / ros_node.publish_rate)  # Publish at configured rate
+        _astar_logged = False    # Guard: log A* path only once when it arrives
 
         # Publish initial goal to trigger A* planning (global goal)
         ros_node.publish_goal()
@@ -311,11 +341,27 @@ def main():
             # Process ROS2 callbacks (non-blocking)
             rclpy.spin_once(ros_node, timeout_sec=0)
 
-            # Track previous waypoint for detecting transitions
-            prev_waypoint_idx = tracker.current_waypoint_idx
+            # Log A* path to flight logger the first time it arrives
+            if ros_node.path_received and not _astar_logged:
+                flight_logger.set_astar_trajectory(ros_node.latest_path)
+                flight_logger.log_event(
+                    f"A* path received: {len(ros_node.latest_path)} waypoints"
+                )
+                _astar_logged = True
 
-            # Update controller
-            state = tracker.update()
+            # Track waypoint index for detecting transitions
+            seq = mpc_controller.mpc_planner.sequencer
+            prev_waypoint_idx = seq.current_index()
+
+            # ── MPC update: push LiDAR scan; sequencer advances inside solve() ──
+            lidar_points_mpc = get_lidar_points(model, data)
+            state = mpc_controller.update(
+                lidar_points=lidar_points_mpc if len(lidar_points_mpc) > 0 else None,
+            )
+            # goal_xy for logging: current target from sequencer
+            goal_xy = seq.current_target()
+            if goal_xy is None:
+                goal_xy = state['position'][:2]
 
             # Step simulation
             mujoco.mj_step(model, data)
@@ -339,19 +385,26 @@ def main():
 
             # Log state periodically
             if step % log_interval == 0:
-                error = controller.get_position_error()
-                control = controller.ctrl_filtered.copy()
+                # error = controller.get_position_error()          # PID
+                # control = controller.ctrl_filtered.copy()        # PID
+                error = float(np.linalg.norm(goal_xy - state['position'][:2]))
+                control = mpc_controller.ctrl_filtered.copy()
 
                 flight_logger.log_state(
                     time=sim_time,
                     state=state,
                     control=control,
-                    target_pos=controller.target_pos,
+                    target_pos=np.array([goal_xy[0], goal_xy[1], mpc_controller.target_z]),
                     error=error
                 )
 
+            # Log MPC predicted trajectory sparsely (every ~0.5 s)
+            if step % mpc_pred_interval == 0 and mpc_controller.last_mpc_result is not None:
+                x_pred = mpc_controller.last_mpc_result.x_pred  # (N+1, 5)
+                flight_logger.log_mpc_prediction(sim_time, x_pred[:, :2])
+
             # Detect waypoint reached
-            if tracker.current_waypoint_idx > prev_waypoint_idx and prev_waypoint_idx < len(tracker.waypoints):
+            if seq.current_index() > prev_waypoint_idx:
                 flight_logger.log_waypoint_reached(
                     waypoint_idx=prev_waypoint_idx,
                     time=sim_time,
@@ -362,26 +415,30 @@ def main():
             if step % 500 == 0:
                 pos = state['position']
                 euler = np.degrees(state['euler'])
-                error = controller.get_position_error()
-                progress = tracker.get_progress() * 100
-
-                path_status = "A* path" if ros_node.path_received else "waiting for A*"
+                error = float(np.linalg.norm(goal_xy - pos[:2]))
+                progress = seq.get_progress() * 100
+                mpc_ok = state.get('mpc_success', False)
+                mpc_ms = state.get('mpc_solve_ms', 0.0)
+                wp_info = (f"wp {seq.current_index()}/{seq.total_waypoints()}"
+                           if seq.has_path() else "waiting for A*")
                 print(f"Pos: [{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}] | "
                       f"Euler: [{euler[0]:.1f}, {euler[1]:.1f}, {euler[2]:.1f}] | "
-                      f"Error: {error:.3f}m | Progress: {progress:.0f}% | {path_status}")
+                      f"Error: {error:.3f}m | {wp_info} ({progress:.0f}%) | "
+                      f"MPC ok={mpc_ok} {mpc_ms:.1f}ms")
 
             viewer.sync()
             step += 1
 
         # Finalize logging
         _cleanup_done = True
-        flight_logger.finalize(trajectory_completed=tracker.is_complete())
+        seq_final = mpc_controller.mpc_planner.sequencer
+        flight_logger.finalize(trajectory_completed=seq_final.is_complete())
 
         print("\nSimulation ended.")
-        if tracker.is_complete():
+        if seq_final.is_complete():
             print("Trajectory completed successfully!")
         else:
-            print(f"Trajectory progress: {tracker.get_progress()*100:.0f}%")
+            print(f"Trajectory progress: {seq_final.get_progress()*100:.0f}%")
 
         print(f"\nFlight logs saved to: {flight_logger.log_dir}")
 
@@ -389,14 +446,15 @@ def main():
         ros_node.destroy_node()
         rclpy.shutdown()
 
-        # Show flight plots
+        # Show flight plots (separate window per topic)
         try:
-            from mujoco_sim.plot_flight import create_summary_figure, load_flight_data
+            from mujoco_sim.plot_flight import create_all_figures, load_flight_data
+            import matplotlib.pyplot as plt
             print("\nGenerating flight plots...")
             plot_data = load_flight_data(flight_logger.log_dir, flight_logger.session_id)
-            save_path = flight_logger.log_dir / f"flight_plot_{flight_logger.session_id}.png"
-            create_summary_figure(plot_data, save_path)
-            import matplotlib.pyplot as plt
+            figures = create_all_figures(plot_data, save_dir=flight_logger.log_dir)
+            print(f"Opened {len(figures)} figure windows: "
+                  f"{', '.join(name for name, _ in figures)}")
             plt.show()
         except ImportError:
             print("Install matplotlib to see flight plots: pip install matplotlib")

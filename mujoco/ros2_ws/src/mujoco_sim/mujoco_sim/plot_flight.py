@@ -80,17 +80,21 @@ def plot_3d_trajectory(data: dict, ax: plt.Axes = None, show_waypoints: bool = T
     ax.scatter(x[0], y[0], z[0], c='green', s=100, marker='o', label='Start')
     ax.scatter(x[-1], y[-1], z[-1], c='red', s=100, marker='s', label='End')
 
-    # Plot waypoints
+    # Plot A* waypoints (preferred) or fallback waypoints
     if show_waypoints and 'trajectory' in data:
-        waypoints = np.array(data['trajectory']['waypoints'])
-        if len(waypoints) > 0:
-            wp_x = [wp[0] for wp in waypoints]
-            wp_y = [wp[1] for wp in waypoints]
-            wp_z = [wp[2] for wp in waypoints]
-            ax.scatter(wp_x, wp_y, wp_z, c='orange', s=150, marker='*',
-                      label='Waypoints', edgecolors='black', linewidths=0.5)
-            # Connect waypoints with dashed line
-            ax.plot(wp_x, wp_y, wp_z, 'k--', linewidth=1, alpha=0.5, label='Planned path')
+        astar_wps = data['trajectory'].get('astar_waypoints', [])
+        fallback_wps = data['trajectory'].get('waypoints', [])
+        waypoints_to_plot = astar_wps if astar_wps else fallback_wps
+        label_prefix = 'A*' if astar_wps else 'Planned'
+
+        if len(waypoints_to_plot) > 0:
+            wp_x = [wp[0] for wp in waypoints_to_plot]
+            wp_y = [wp[1] for wp in waypoints_to_plot]
+            wp_z = [wp[2] for wp in waypoints_to_plot]
+            ax.scatter(wp_x, wp_y, wp_z, c='orange', s=60, marker='o',
+                      label=f'{label_prefix} waypoints', edgecolors='black', linewidths=0.5)
+            ax.plot(wp_x, wp_y, wp_z, '--', color='orange', linewidth=1.5,
+                    alpha=0.8, label=f'{label_prefix} path')
 
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
@@ -252,13 +256,20 @@ def plot_2d_trajectory_xy(data: dict, ax: plt.Axes = None):
     ax.plot(x[0], y[0], 'go', markersize=12, label='Start')
     ax.plot(x[-1], y[-1], 'rs', markersize=12, label='End')
 
-    # Waypoints
+    # A* waypoints (preferred) or fallback
     if 'trajectory' in data:
-        waypoints = data['trajectory']['waypoints']
-        wp_x = [wp[0] for wp in waypoints]
-        wp_y = [wp[1] for wp in waypoints]
-        ax.plot(wp_x, wp_y, 'k*--', markersize=15, linewidth=1,
-               alpha=0.7, label='Waypoints')
+        astar_wps = data['trajectory'].get('astar_waypoints', [])
+        fallback_wps = data['trajectory'].get('waypoints', [])
+        waypoints_to_plot = astar_wps if astar_wps else fallback_wps
+        label_prefix = 'A*' if astar_wps else 'Planned'
+
+        if waypoints_to_plot:
+            wp_x = [wp[0] for wp in waypoints_to_plot]
+            wp_y = [wp[1] for wp in waypoints_to_plot]
+            ax.plot(wp_x, wp_y, '--', color='orange', linewidth=2,
+                    alpha=0.9, label=f'{label_prefix} path')
+            ax.plot(wp_x, wp_y, 'o', color='orange', markersize=7,
+                    markeredgecolor='black', markeredgewidth=0.5)
 
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
@@ -270,87 +281,256 @@ def plot_2d_trajectory_xy(data: dict, ax: plt.Axes = None):
     return ax
 
 
-def create_summary_figure(data: dict, save_path: Path = None):
-    """Create a comprehensive summary figure."""
-    fig = plt.figure(figsize=(16, 12))
+def plot_trajectory_comparison(data: dict, ax: plt.Axes = None):
+    """
+    Debug plot: overlay actual trajectory, A* planned path, and MPC predictions.
 
-    # 3D trajectory (top-left, larger) - or 2D altitude plot if 3D unavailable
-    if HAS_3D:
-        ax1 = fig.add_subplot(2, 3, 1, projection='3d')
-        plot_3d_trajectory(data, ax1)
-    else:
-        ax1 = fig.add_subplot(2, 3, 1)
-        positions = np.array(data['state_history']['position'])
-        time = np.array(data['state_history']['time'])
-        ax1.plot(time, positions[:, 2], 'b-', linewidth=1.5)
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Altitude (m)')
-        ax1.set_title('Altitude vs Time')
-        ax1.grid(True, alpha=0.3)
+    Shows:
+      - Actual drone path (blue, colored by time)
+      - A* planned waypoints + connecting line (orange)
+      - MPC predicted horizons sampled at regular intervals (light green)
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
 
-    # 2D trajectory (top-middle)
-    ax2 = fig.add_subplot(2, 3, 2)
-    plot_2d_trajectory_xy(data, ax2)
-
-    # Tracking error (top-right)
-    ax3 = fig.add_subplot(2, 3, 3)
-    plot_tracking_error(data, ax3)
-
-    # Position vs time (bottom-left)
-    ax4 = fig.add_subplot(2, 3, 4)
-    time = np.array(data['state_history']['time'])
     positions = np.array(data['state_history']['position'])
-    ax4.plot(time, positions[:, 0], label='X')
-    ax4.plot(time, positions[:, 1], label='Y')
-    ax4.plot(time, positions[:, 2], label='Z')
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Position (m)')
-    ax4.set_title('Position vs Time')
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
+    time = np.array(data['state_history']['time'])
+    x, y = positions[:, 0], positions[:, 1]
 
-    # Orientation vs time (bottom-middle)
-    ax5 = fig.add_subplot(2, 3, 5)
-    euler = np.degrees(np.array(data['state_history']['euler']))
-    ax5.plot(time, euler[:, 0], label='Roll')
-    ax5.plot(time, euler[:, 1], label='Pitch')
-    ax5.plot(time, euler[:, 2], label='Yaw')
-    ax5.set_xlabel('Time (s)')
-    ax5.set_ylabel('Angle (deg)')
-    ax5.set_title('Orientation vs Time')
-    ax5.legend()
-    ax5.grid(True, alpha=0.3)
+    # Actual trajectory (colored by time)
+    sc = ax.scatter(x, y, c=time, cmap='Blues', s=3, alpha=0.8, zorder=3)
+    plt.colorbar(sc, ax=ax, label='Time (s)', fraction=0.025, pad=0.02, shrink=0.8)
+    ax.plot(x[0], y[0], 'go', markersize=10, zorder=5, label='Start')
+    ax.plot(x[-1], y[-1], 'rs', markersize=10, zorder=5, label='End')
 
-    # Velocity vs time (bottom-right)
-    ax6 = fig.add_subplot(2, 3, 6)
-    velocity = np.array(data['state_history']['velocity'])
-    speed = np.linalg.norm(velocity, axis=1)
-    ax6.plot(time, velocity[:, 0], label='Vx', alpha=0.7)
-    ax6.plot(time, velocity[:, 1], label='Vy', alpha=0.7)
-    ax6.plot(time, velocity[:, 2], label='Vz', alpha=0.7)
-    ax6.plot(time, speed, 'k-', linewidth=2, label='Speed')
-    ax6.set_xlabel('Time (s)')
-    ax6.set_ylabel('Velocity (m/s)')
-    ax6.set_title('Velocity vs Time')
-    ax6.legend()
-    ax6.grid(True, alpha=0.3)
+    # A* planned path
+    astar_wps = data['trajectory'].get('astar_waypoints', [])
+    if astar_wps:
+        wp_x = [wp[0] for wp in astar_wps]
+        wp_y = [wp[1] for wp in astar_wps]
+        ax.plot(wp_x, wp_y, '--', color='#ff7f0e', linewidth=2.5,
+                alpha=0.9, zorder=4, label='A* planned path')
+        ax.plot(wp_x, wp_y, 'o', color='#ff7f0e', markersize=8,
+                markeredgecolor='black', markeredgewidth=0.5, zorder=4)
 
-    # Add session info
-    meta = data['metadata']
+    # MPC predicted trajectories (sampled uniformly, up to 15 shown)
+    mpc_preds = data.get('mpc_predictions', [])
+    if mpc_preds:
+        n_total = len(mpc_preds)
+        step = max(1, n_total // 15)
+        indices = list(range(0, n_total, step))
+        cmap = plt.cm.Greens
+        for k, idx in enumerate(indices):
+            pred = mpc_preds[idx]
+            xy = np.array(pred['xy'])   # (N+1, 2)
+            alpha = 0.25 + 0.55 * (k / max(len(indices) - 1, 1))
+            label = 'MPC horizon' if k == 0 else None
+            ax.plot(xy[:, 0], xy[:, 1], '-', color=cmap(0.4 + 0.5 * k / max(len(indices) - 1, 1)),
+                    linewidth=1.2, alpha=alpha, zorder=2, label=label)
+            ax.plot(xy[0, 0], xy[0, 1], '.', color='darkgreen',
+                    markersize=5, alpha=alpha, zorder=2)
+
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    ax.set_title('Trajectory Comparison: Actual vs A* vs MPC Predictions')
+    ax.legend(loc='lower right', fontsize=9, framealpha=0.85)
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+    return ax
+
+
+def plot_mpc_diagnostics(data: dict, axes=None):
+    """
+    Plot MPC cost and solve time over time.
+
+    Creates two vertically-stacked subplots:
+        1. MPC cost vs time
+        2. MPC solve time vs time (with success/failure coloring)
+
+    Args:
+        data: Flight data dict (must contain 'mpc_history' key)
+        axes: Optional array of 2 Axes
+
+    Returns:
+        axes or None if no MPC data available
+    """
+    mpc = data.get('mpc_history')
+    if mpc is None or len(mpc.get('time', [])) == 0:
+        return None
+
+    time = np.array(mpc['time'])
+    cost = np.array(mpc['cost'])
+    solve_ms = np.array(mpc['solve_time_ms'])
+    success = np.array(mpc['success'])
+
+    if axes is None:
+        fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
+
+    # ── Cost vs time ──
+    ax_cost = axes[0]
+    ax_cost.plot(time, cost, 'b-', linewidth=1.2, label='MPC cost')
+    ax_cost.fill_between(time, 0, cost, alpha=0.15, color='blue')
+    # Mark failures
+    fail_mask = ~success.astype(bool)
+    if np.any(fail_mask):
+        ax_cost.scatter(time[fail_mask], cost[fail_mask], c='red', s=30,
+                        zorder=5, label='Solver failed')
+    ax_cost.set_ylabel('Cost')
+    ax_cost.set_title('MPC Cost vs Time')
+    ax_cost.legend(loc='upper right')
+    ax_cost.grid(True, alpha=0.3)
+
+    # Stats annotation
+    stats = data['metadata'].get('stats', {})
+    stats_text = (f"Mean: {stats.get('mpc_mean_cost', 0):.1f}\n"
+                  f"Max: {stats.get('mpc_max_cost', 0):.1f}\n"
+                  f"Success: {stats.get('mpc_success_rate', 0)*100:.0f}%")
+    ax_cost.text(0.02, 0.95, stats_text, transform=ax_cost.transAxes, fontsize=9,
+                 verticalalignment='top',
+                 bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.7))
+
+    # ── Solve time vs time ──
+    ax_t = axes[1]
+    colors = np.where(success.astype(bool), '#2ca02c', '#d62728')  # green / red
+    ax_t.bar(time, solve_ms, width=np.median(np.diff(time)) * 0.8 if len(time) > 1 else 0.01,
+             color=colors, alpha=0.7)
+    ax_t.set_ylabel('Solve time (ms)')
+    ax_t.set_xlabel('Time (s)')
+    ax_t.set_title('MPC Solve Time vs Time')
+    ax_t.grid(True, alpha=0.3)
+
+    solve_text = (f"Mean: {stats.get('mpc_mean_solve_ms', 0):.1f} ms\n"
+                  f"Max: {stats.get('mpc_max_solve_ms', 0):.1f} ms")
+    ax_t.text(0.02, 0.95, solve_text, transform=ax_t.transAxes, fontsize=9,
+              verticalalignment='top',
+              bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.7))
+
+    return axes
+
+
+def create_all_figures(data: dict, save_dir: Path = None) -> list:
+    """
+    Create one figure window per topic for post-flight analysis.
+
+    Returns a list of (name, figure) tuples:
+      1. trajectory_comparison  — actual path vs A* plan vs MPC horizons (main debug view)
+      2. trajectory_3d          — 3D flight path with waypoints
+      3. time_domain            — position, orientation, velocity vs time (3 subplots)
+      4. tracking_error         — position error vs time
+      5. mpc_diagnostics        — MPC cost + solve time (only if MPC data present)
+    """
+    meta  = data['metadata']
     stats = meta.get('stats', {})
-    title = (f"Flight Session: {meta['session_id']} | "
-             f"Duration: {stats.get('duration_s', 0):.1f}s | "
-             f"Distance: {stats.get('total_distance', 0):.2f}m | "
-             f"Completed: {meta.get('trajectory_completed', False)}")
-    fig.suptitle(title, fontsize=12, fontweight='bold')
+    sid   = meta['session_id']
+    base_title = (f"Session {sid} | "
+                  f"{stats.get('duration_s', 0):.1f}s | "
+                  f"{stats.get('total_distance', 0):.2f}m | "
+                  f"Completed: {meta.get('trajectory_completed', False)}")
 
+    figures = []
+
+    # ── 1. Trajectory comparison ──────────────────────────────────────────
+    fig1, ax1 = plt.subplots(figsize=(12, 9))
+    plot_trajectory_comparison(data, ax1)
+    fig1.suptitle(f"Trajectory Comparison | {base_title}", fontsize=11, fontweight='bold')
     plt.tight_layout()
+    figures.append(('trajectory_comparison', fig1))
 
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"Figure saved to: {save_path}")
+    # ── 2. 3D trajectory (or altitude fallback) ───────────────────────────
+    if HAS_3D:
+        fig2 = plt.figure(figsize=(9, 7))
+        ax2 = fig2.add_subplot(111, projection='3d')
+        plot_3d_trajectory(data, ax2)
+    else:
+        fig2, ax2 = plt.subplots(figsize=(9, 5))
+        time_arr = np.array(data['state_history']['time'])
+        positions = np.array(data['state_history']['position'])
+        ax2.plot(time_arr, positions[:, 2], 'b-', linewidth=1.5)
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('Altitude (m)')
+        ax2.set_title('Altitude vs Time')
+        ax2.grid(True, alpha=0.3)
+    fig2.suptitle(f"3D Trajectory | {base_title}", fontsize=11, fontweight='bold')
+    plt.tight_layout()
+    figures.append(('trajectory_3d', fig2))
 
-    return fig
+    # ── 3. Time-domain states ─────────────────────────────────────────────
+    time_arr  = np.array(data['state_history']['time'])
+    positions = np.array(data['state_history']['position'])
+    euler     = np.degrees(np.array(data['state_history']['euler']))
+    velocity  = np.array(data['state_history']['velocity'])
+    speed     = np.linalg.norm(velocity, axis=1)
+
+    fig3, axes3 = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+
+    axes3[0].plot(time_arr, positions[:, 0], label='X')
+    axes3[0].plot(time_arr, positions[:, 1], label='Y')
+    axes3[0].plot(time_arr, positions[:, 2], label='Z')
+    axes3[0].set_ylabel('Position (m)')
+    axes3[0].set_title('Position vs Time')
+    axes3[0].legend(fontsize=9, loc='upper right')
+    axes3[0].grid(True, alpha=0.3)
+
+    axes3[1].plot(time_arr, euler[:, 0], label='Roll')
+    axes3[1].plot(time_arr, euler[:, 1], label='Pitch')
+    axes3[1].plot(time_arr, euler[:, 2], label='Yaw')
+    axes3[1].set_ylabel('Angle (deg)')
+    axes3[1].set_title('Orientation vs Time')
+    axes3[1].legend(fontsize=9, loc='upper right')
+    axes3[1].grid(True, alpha=0.3)
+    axes3[1].axhline(y=0, color='gray', linewidth=0.5)
+
+    axes3[2].plot(time_arr, velocity[:, 0], label='Vx', alpha=0.8)
+    axes3[2].plot(time_arr, velocity[:, 1], label='Vy', alpha=0.8)
+    axes3[2].plot(time_arr, velocity[:, 2], label='Vz', alpha=0.8)
+    axes3[2].plot(time_arr, speed, 'k-', linewidth=1.8, label='Speed')
+    axes3[2].set_xlabel('Time (s)')
+    axes3[2].set_ylabel('Velocity (m/s)')
+    axes3[2].set_title('Velocity vs Time')
+    axes3[2].legend(fontsize=9, loc='upper right')
+    axes3[2].grid(True, alpha=0.3)
+
+    fig3.suptitle(f"State Time-Domain | {base_title}", fontsize=11, fontweight='bold')
+    plt.tight_layout()
+    figures.append(('time_domain', fig3))
+
+    # ── 4. Tracking error ────────────────────────────────────────────────
+    fig4, ax4 = plt.subplots(figsize=(12, 4))
+    plot_tracking_error(data, ax4)
+    fig4.suptitle(f"Tracking Error | {base_title}", fontsize=11, fontweight='bold')
+    plt.tight_layout()
+    figures.append(('tracking_error', fig4))
+
+    # ── 5. MPC diagnostics (only when data available) ────────────────────
+    has_mpc = 'mpc_history' in data and len(data['mpc_history'].get('time', [])) > 0
+    if has_mpc:
+        fig5, axes5 = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
+        plot_mpc_diagnostics(data, axes5)
+        mpc_stats = (f" | Success: {stats.get('mpc_success_rate', 0)*100:.0f}%"
+                     f" ({stats.get('mpc_total_solves', 0)} solves)"
+                     f" | Mean solve: {stats.get('mpc_mean_solve_ms', 0):.1f}ms")
+        fig5.suptitle(f"MPC Diagnostics | {base_title}{mpc_stats}",
+                      fontsize=11, fontweight='bold')
+        plt.tight_layout()
+        figures.append(('mpc_diagnostics', fig5))
+
+    # ── Save if requested ────────────────────────────────────────────────
+    if save_dir is not None:
+        save_dir = Path(save_dir)
+        for name, fig in figures:
+            path = save_dir / f"{name}_{sid}.png"
+            fig.savefig(path, dpi=150, bbox_inches='tight')
+            print(f"Saved: {path}")
+
+    return figures
+
+
+def create_summary_figure(data: dict, save_path: Path = None):
+    """Legacy single-figure summary. Prefer create_all_figures() for debugging."""
+    figs = create_all_figures(data, save_dir=save_path.parent if save_path else None)
+    # Return the trajectory comparison figure for backward compatibility
+    return figs[0][1] if figs else None
 
 
 def main():
@@ -385,11 +565,12 @@ def main():
     session_id = data['metadata']['session_id']
     print(f"Plotting flight session: {session_id}")
 
-    # Create summary figure
-    save_path = log_dir / f"flight_plot_{session_id}.png" if args.save else None
-    create_summary_figure(data, save_path)
+    # Create one figure per topic
+    save_dir = log_dir if args.save else None
+    figures = create_all_figures(data, save_dir=save_dir)
+    print(f"Opened {len(figures)} figure windows: "
+          f"{', '.join(name for name, _ in figures)}")
 
-    # Show plots
     plt.show()
 
 
