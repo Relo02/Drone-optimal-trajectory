@@ -36,11 +36,16 @@ The system combines a **global path planner** (A\*) with a **local MPC controlle
 ```mermaid
 flowchart TD
     LIDAR([LiDAR Point Cloud])
-    GGM["GaussianGridMap\n(obstacle probability field)"]
-    ASTAR["AStarLocalPlanner\n(global path · 2 Hz)"]
-    BSPLINE(["B-spline interpolant\n(soft obstacle cost)"])
-    MPC["NewMPCPlanner — IPOPT\nN=50 · dt=0.05 s · ~20 Hz"]
-    ATT["Attitude Controller\n+ Altitude PD · 50 Hz"]
+    GGM[`GaussianGridMap
+    (obstacle probability field)`]
+    ASTAR[`AStarLocalPlanner
+    (global path · 2 Hz)`]
+    BSPLINE([`B-spline interpolant
+    (soft obstacle cost)`])
+    MPC[`NewMPCPlanner — IPOPT
+    N=50 · dt=0.05 s · ~20 Hz`]
+    ATT[`Attitude Controller
+    + Altitude PD · 50 Hz`]
     ACT([MuJoCo Actuators])
 
     LIDAR --> GGM
