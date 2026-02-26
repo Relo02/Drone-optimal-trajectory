@@ -30,7 +30,7 @@
 
 ## 1. System Overview
 
-The system combines a **local path planner** (A\*) with a **local MPC controller** to navigate towards a global goal by combining safety and responsiveness of the drone. The simulation environment is characterized by a quadrotor placed in an obstacle-filled environment with a 2-D LiDAR scans. In order to validate the MPC, the mujoco environemnt is firstly set to be deterministic. After reproducable results are obtained through mujoco simulation, the core part will be to integrate the entire planning piepline into PX4 SITL.
+The system combines a **local path planner** (A\*) with a **local MPC controller** to navigate towards a global goal by combining safety and responsiveness of the drone. The simulation environment is characterized by a quadrotor placed in an obstacle-filled environment with a 2-D LiDAR scans. In order to validate the MPC, mujoco environemnt is firstly set to be deterministic. After reproducable results are obtained through mujoco simulation, the core objective will be to integrate the entire planning piepline into PX4 SITL.
 
 ```mermaid
 flowchart TD
@@ -76,7 +76,7 @@ The `GaussianGridMap` converts a raw LiDAR point cloud into a 2-D **obstacle pro
 For each grid cell centred at world position $(x, y)$ the obstacle probability is:
 
 $$
-\boxed{P(x, y) = 1 - \Phi\!\left(\frac{d_{\min}(x,y)}{\sigma}\right)}
+\boxed{P(x, y) = 1 - \Phi \left(\frac{d_{\min}(x,y)}{\sigma}\right)}
 $$
 
 where
