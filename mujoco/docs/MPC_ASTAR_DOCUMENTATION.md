@@ -2,7 +2,6 @@
 
 **Project:** Drone Optimal Trajectory | MuJoCo Simulation
 **Author:** Lorenzo Ortolani
-**Branch:** `A_star_planner`
 
 ---
 
