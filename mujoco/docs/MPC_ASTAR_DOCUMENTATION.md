@@ -30,7 +30,7 @@
 
 ## 1. System Overview
 
-The system combines a **global path planner** (A\*) with a **local MPC controller** to navigate a simulated quadrotor through an obstacle-filled environment detected by a 2-D LiDAR.
+The system combines a **local path planner** (A\*) with a **local MPC controller** to navigate towards a global goal by combining safety and responsiveness of the drone. The simulation environment is characterized by a quadrotor placed in an obstacle-filled environment with a 2-D LiDAR scans. In order to validate the MPC, the mujoco environemnt is firstly set to be deterministic. After reproducable results are obtained through mujoco simulation, the core part will be to integrate the entire planning piepline into PX4 SITL.
 
 ```mermaid
 flowchart TD
