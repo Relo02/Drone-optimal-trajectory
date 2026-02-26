@@ -60,7 +60,7 @@ flowchart TD
 | Layer | Module | Frequency |
 |-------|--------|-----------|
 | Obstacle mapping | `GaussianGridMap` | On every LiDAR scan |
-| Global planning | `AStarLocalPlanner` | 2 Hz (replanning) |
+| A* local planning | `AStarLocalPlanner` | 2 Hz (replanning) |
 | MPC solve | `NewMPCPlanner` (IPOPT) | ~20 Hz (background thread) |
 | Attitude control | `AttitudeController` | 50 Hz (sim timestep) |
 
