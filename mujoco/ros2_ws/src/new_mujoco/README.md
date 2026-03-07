@@ -26,33 +26,33 @@ The stack combines a real-time **Gaussian occupancy grid**, a **rolling-horizon 
 
 ## 1. System Architecture
 
-graph TD
-    subgraph skydio_sim_node["skydio_sim_node\nMuJoCo physics + 3-D LiDAR + Cascaded PID"]
-        SIM["simulation loop"]
+```mermaid
+flowchart TD
+    GOAL([/goal_pose])
+
+    subgraph SIM["skydio_sim_node — MuJoCo physics · 3-D LiDAR · Cascaded PID"]
     end
 
-    subgraph a_star_node["a_star_node"]
-        ASTAR["FixedGaussianGridMap\n+ AStarPlanner"]
+    subgraph AST["a_star_node"]
+        A1["FixedGaussianGridMap + AStarPlanner"]
     end
 
-    subgraph mpc_node["mpc_node"]
-        MPC["FixedGaussianGridMap (own copy)\nMPCTracker (CasADi / IPOPT)"]
+    subgraph MPC_BOX["mpc_node"]
+        M1["FixedGaussianGridMap own copy · MPCTracker CasADi / IPOPT"]
     end
 
-    skydio_sim_node -- "/skydio/pose" --> a_star_node
-    skydio_sim_node -- "/skydio/scan3d" --> a_star_node
-    skydio_sim_node -- "/skydio/pose" --> mpc_node
-    skydio_sim_node -- "/skydio/scan3d" --> mpc_node
+    OUT["<b>outputs</b><br/>/mpc/predicted_path<br/>/mpc/next_setpoint<br/>/mpc/diagnostics"]
 
-    a_star_node -- "/a_star/path" --> mpc_node
-    a_star_node -- "/a_star/grid_raw" --> mpc_node
-    a_star_node -- "/a_star/occupancy_grid" --> mpc_node
-
-    mpc_node -- "/mpc/predicted_path" --> OUT1((" "))
-    mpc_node -- "/mpc/next_setpoint" --> OUT2((" "))
-    mpc_node -- "/mpc/diagnostics" --> OUT3((" "))
-
-    GOAL(["/goal_pose"]) --> skydio_sim_node
+    GOAL --> SIM
+    SIM -->|"/skydio/pose"| AST
+    SIM -->|"/skydio/scan3d"| AST
+    SIM -->|"/skydio/pose"| MPC_BOX
+    SIM -->|"/skydio/scan3d"| MPC_BOX
+    AST -->|"/a_star/path"| MPC_BOX
+    AST -->|"/a_star/grid_raw"| MPC_BOX
+    AST -->|"/a_star/occupancy_grid"| MPC_BOX
+    MPC_BOX --> OUT
+```
 
 
 **Data flow summary**
