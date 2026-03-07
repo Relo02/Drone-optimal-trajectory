@@ -22,10 +22,11 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from std_msgs.msg import Header
-from geometry_msgs.msg import PoseStamped, Point
+from geometry_msgs.msg import PoseStamped, Point, TransformStamped
 from nav_msgs.msg import Path
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs_py import point_cloud2
+from tf2_ros import TransformBroadcaster
 
 from mujoco_sim.controllers import DroneController, TrajectoryTracker, MPCDroneController
 try:
@@ -113,7 +114,7 @@ class MujocoSimNode(Node):
         super().__init__('mujoco_sim')
 
         # Declare parameters
-        self.declare_parameter('goal_x', 10.0)
+        self.declare_parameter('goal_x', 20.0)
         self.declare_parameter('goal_y', 1.0)
         self.declare_parameter('goal_z', 1.5)
         self.declare_parameter('publish_rate', 50.0)
@@ -134,6 +135,12 @@ class MujocoSimNode(Node):
         self.pose_pub = self.create_publisher(PoseStamped, '/drone/pose', 10)
         self.lidar_pub = self.create_publisher(PointCloud2, '/lidar/points', sensor_qos)
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
+        # MPC trajectory predictions
+        self.mpc_traj_pos_pub = self.create_publisher(Path, '/mpc/predicted_positions', 10)
+        self.mpc_traj_acc_pub = self.create_publisher(Path, '/mpc/predicted_accelerations', 10)
+        
+        # TF broadcaster
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscriber for planned path
         self.path_sub = self.create_subscription(
@@ -233,6 +240,68 @@ class MujocoSimNode(Node):
 
         self.goal_pub.publish(msg)
 
+    def publish_mpc_trajectory_positions(self, x_pred, target_z):
+        """Publish MPC predicted positions as Path message."""
+        if x_pred is None or len(x_pred) == 0:
+            return
+        
+        msg = Path()
+        msg.header = Header()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'world'
+        
+        for i in range(len(x_pred)):
+            pose_stamped = PoseStamped()
+            pose_stamped.header = msg.header
+            pose_stamped.pose.position.x = float(x_pred[i, 0])  # px
+            pose_stamped.pose.position.y = float(x_pred[i, 1])  # py
+            pose_stamped.pose.position.z = float(target_z)      # use target altitude
+            pose_stamped.pose.orientation.w = 1.0
+            msg.poses.append(pose_stamped)
+        
+        self.mpc_traj_pos_pub.publish(msg)
+    
+    def publish_mpc_trajectory_accelerations(self, u_opt, target_z):
+        """Publish MPC predicted accelerations as Path message (using positions to represent acc vectors)."""
+        if u_opt is None or len(u_opt) == 0:
+            return
+        
+        msg = Path()
+        msg.header = Header()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'world'
+        
+        for i in range(len(u_opt)):
+            pose_stamped = PoseStamped()
+            pose_stamped.header = msg.header
+            pose_stamped.pose.position.x = float(u_opt[i, 0])  # ax
+            pose_stamped.pose.position.y = float(u_opt[i, 1])  # ay 
+            pose_stamped.pose.position.z = 0.0                 # az (not used in 2D MPC)
+            pose_stamped.pose.orientation.w = 1.0
+            msg.poses.append(pose_stamped)
+        
+        self.mpc_traj_acc_pub.publish(msg)
+    
+    def publish_drone_tf(self, position, orientation):
+        """Publish drone transform."""
+        tf_msg = TransformStamped()
+        tf_msg.header.stamp = self.get_clock().now().to_msg()
+        tf_msg.header.frame_id = 'world'
+        tf_msg.child_frame_id = 'drone_base_link'
+        
+        # Translation
+        tf_msg.transform.translation.x = float(position[0])
+        tf_msg.transform.translation.y = float(position[1])
+        tf_msg.transform.translation.z = float(position[2])
+        
+        # Rotation (MuJoCo quaternion [w,x,y,z] to ROS [x,y,z,w])
+        tf_msg.transform.rotation.x = float(orientation[1])
+        tf_msg.transform.rotation.y = float(orientation[2])
+        tf_msg.transform.rotation.z = float(orientation[3])
+        tf_msg.transform.rotation.w = float(orientation[0])
+        
+        self.tf_broadcaster.sendTransform(tf_msg)
+
 
 
 def main():
@@ -313,11 +382,14 @@ def main():
     print()
     print("ROS2 Topics:")
     print("  Publishers:")
-    print("    /drone/pose     - Current drone pose")
-    print("    /lidar/points   - Lidar point cloud")
-    print("    /goal_pose      - Goal for A* planner")
+    print("    /drone/pose               - Current drone pose")
+    print("    /lidar/points             - Lidar point cloud")
+    print("    /goal_pose                - Goal for A* planner")
+    print("    /mpc/predicted_positions  - MPC predicted trajectory positions")
+    print("    /mpc/predicted_accelerations - MPC predicted accelerations")
+    print("    /tf                       - Transform: world -> drone_base_link")
     print("  Subscribers:")
-    print("    /planned_path   - Path from A* planner")
+    print("    /planned_path             - Path from A* planner")
     print()
     print("Controls:")
     print("  - Green spheres: Lidar hit points")
@@ -374,9 +446,21 @@ def main():
                 position = data.qpos[:3]
                 orientation = data.qpos[3:7]
                 ros_node.publish_pose(position, orientation)
+                ros_node.publish_drone_tf(position, orientation)
 
                 lidar_points = get_lidar_points(model, data)
                 ros_node.publish_lidar(lidar_points)
+                
+                # Publish MPC trajectory predictions
+                if mpc_controller.last_mpc_result is not None:
+                    ros_node.publish_mpc_trajectory_positions(
+                        mpc_controller.last_mpc_result.x_pred, 
+                        mpc_controller.target_z
+                    )
+                    ros_node.publish_mpc_trajectory_accelerations(
+                        mpc_controller.last_mpc_result.u_opt,
+                        mpc_controller.target_z
+                    )
 
                 # Only publish goal at start until we have a path
                 if not ros_node.path_received:

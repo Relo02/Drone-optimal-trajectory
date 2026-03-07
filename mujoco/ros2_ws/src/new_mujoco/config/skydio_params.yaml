@@ -1,0 +1,211 @@
+/**:
+  ros__parameters:
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # MuJoCo model path (absolute)
+    # ──────────────────────────────────────────────────────────────────────────
+    model_path: "/home/lorenzo/Drone-optimal-trajectory/mujoco/MuJoCo/mujoco_menagerie-main/skydio_x2/skydio_world.xml"
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Reference (goal) position [m] and heading [rad]
+    # These values are published on /skydio/reference_pose at 2 Hz.
+    # They can be overridden at runtime by publishing to /goal_pose.
+    # ──────────────────────────────────────────────────────────────────────────
+    ref_x: 20.0
+    ref_y: 1.0
+    ref_z: 1.5
+    ref_yaw: 0.0
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Publish rate for /skydio/pose, /skydio/scan3d, /skydio/imu [Hz]
+    # ──────────────────────────────────────────────────────────────────────────
+    publish_rate_hz: 100.0
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Kinematic limits
+    # ──────────────────────────────────────────────────────────────────────────
+    max_speed_xy:  1.5        # [m/s]   maximum horizontal speed
+    max_speed_z:   0.6        # [m/s]   maximum vertical speed
+    max_accel_xy:  1.5        # [m/s²]  maximum horizontal acceleration command
+    max_accel_z:   1.0        # [m/s²]  maximum vertical acceleration command
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Wind and aerodynamic drag
+    # ──────────────────────────────────────────────────────────────────────────
+    # Constant mean wind in world frame [m/s]
+    wind_x: 0.0               # eastward component
+    wind_y: 0.0               # northward component
+    wind_z: 0.0               # vertical component
+    # Ornstein-Uhlenbeck turbulence
+    wind_turbulence_std: 0.3  # [m/s]  1-sigma gust amplitude
+    wind_turbulence_tau: 2.0  # [s]    turbulence correlation time
+    # Quadratic aerodynamic drag: F = -drag_coeff * |v_rel| * v_rel
+    drag_coeff: 0.25          # [kg/m] (~Cd*A*rho/2 for Skydio X2 frontal area)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Lidar ground removal
+    # ──────────────────────────────────────────────────────────────────────────
+    ground_removal_z: 0.05    # [m]  world-frame z below which hits are discarded
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Hover feed-forward [N per motor]
+    # At hover: 4 × hover_thrust = total_mass × g
+    # For Skydio X2 (mass ≈ 1.325 kg):  4 × 3.2495625 ≈ 12.998 N ≈ 1.325 × 9.81
+    # ──────────────────────────────────────────────────────────────────────────
+    hover_thrust: 3.2495625
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Control loop dividers (number of sim steps between loop updates)
+    # MuJoCo timestep = 0.01 s
+    #   pos_loop_divider = 20 → position loop at 5 Hz
+    #   vel_loop_divider =  5 → velocity / altitude loop at 20 Hz
+    #   attitude loop runs every sim step (100 Hz)
+    # ──────────────────────────────────────────────────────────────────────────
+    pos_loop_divider: 20
+    vel_loop_divider: 5
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Layer 1 — Position PID
+    # Input : position error [m]
+    # Output: desired velocity [m/s]  (clamped by pos_vel_limit)
+    # ──────────────────────────────────────────────────────────────────────────
+    pos_kp: 0.6
+    pos_ki: 0.0
+    pos_kd: 0.15
+    pos_vel_limit: 1.2        # [m/s] maximum commanded velocity in XY
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Layer 2a — Altitude PID
+    # Input : altitude error [m]
+    # Output: thrust correction per motor [N]  (added to hover_thrust)
+    # ──────────────────────────────────────────────────────────────────────────
+    alt_kp: 2.0
+    alt_ki: 0.15
+    alt_kd: 0.8
+    alt_thrust_limit: 1.2     # [N] max thrust correction per motor
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Layer 2b — Velocity → angle setpoint PIDs
+    # Input : velocity error [m/s]
+    # Output: desired roll / pitch angle [rad]  (clamped by vel_angle_limit)
+    # ──────────────────────────────────────────────────────────────────────────
+    vel_kp: 0.06
+    vel_ki: 0.001
+    vel_kd: 0.01
+    vel_angle_limit: 0.08     # [rad] ≈ 4.6° maximum angle setpoint from velocity PID
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Layer 3 — Attitude PIDs
+    # Input : attitude error [rad]
+    # Output: motor torque command [N]  (added/subtracted in motor mixer)
+    # ──────────────────────────────────────────────────────────────────────────
+    roll_kp:  2.5
+    roll_ki:  0.5
+    roll_kd:  1.2
+    roll_limit: 1.0           # [N] max roll torque command
+
+    pitch_kp: 2.5
+    pitch_ki: 0.5
+    pitch_kd: 1.2
+    pitch_limit: 1.0          # [N] max pitch torque command
+
+    yaw_kp:   0.5
+    yaw_ki:   0.0
+    yaw_kd:   5.0
+    yaw_limit: 3.0            # [N] max yaw torque command
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A* planner node  (a_star_node)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Global goal in world frame [m].
+    # Overridden at runtime by publishing to /global_goal.
+    # Keep in sync with ref_x / ref_y / ref_z above.
+    goal_x: 20.0
+    goal_y:  1.0
+    goal_z:  1.5
+
+    # Grid map parameters (FixedGaussianGridMap)
+    grid_reso:       0.25     # [m]  cell size
+    grid_half_width: 5.0      # [m]  half-extent of the square local map
+                              #       → full grid = 10 m × 10 m
+    grid_std:        0.7      # [m]  Gaussian spread per obstacle point
+                              #       0.7 m → 50% occupancy at 0.7 m from hit,
+                              #       giving a wider safety corridor than 0.4 m
+
+    # A* cost parameters
+    obstacle_threshold:    0.1    # cells with probability >= this are hard obstacles
+                                  # lowered from 0.5 to block cells earlier
+    obstacle_cost_weight: 15.0    # soft cost multiplier; raised for stronger avoidance
+
+    # Replanning rate [Hz] — how often the planner rebuilds the A* path
+    replan_rate_hz: 5.0
+
+    # Goal-reached radius [m] — stop replanning when within this distance
+    goal_reached_radius: 0.3
+
+    # LiDAR range filter applied before building the grid [m]
+    # Points beyond this distance are discarded (set >= grid_half_width)
+    max_lidar_range: 6.0
+
+    # Planning altitude [m] — z assigned to 2-D A* waypoints
+    planning_height: 1.5
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # MPC tracker node  (mpc_node)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Prediction horizon
+    mpc_N:  30                # number of prediction steps
+    mpc_dt: 0.1               # [s]  discretisation step
+
+    # Kinematic limits for the MPC optimisation
+    mpc_v_max_xy:      2.0    # [m/s]   max horizontal speed
+    mpc_v_max_z:       1.0    # [m/s]   max vertical speed
+    mpc_a_max_xy:      2.0    # [m/s²]  max horizontal acceleration
+    mpc_a_max_z:       1.5    # [m/s²]  max vertical acceleration
+    mpc_yaw_rate_max:  1.5    # [rad/s] max yaw rate
+
+    # Desired cruising speed along the A* path [m/s]
+    mpc_v_ref: 1.0
+
+    # State tracking weights
+    mpc_Q_xy:       30.0      # horizontal position error
+    mpc_Q_z:        20.0      # altitude error
+    mpc_Q_vel_xy:    10.0      # horizontal velocity error
+    mpc_Q_vel_z:     2.0      # vertical velocity error
+    mpc_Q_yaw:       0.2      # heading error
+    mpc_Q_terminal: 50.0      # terminal cost multiplier (applied on top of Q_*)
+
+    # Control effort weights
+    mpc_R_acc_xy:    1.0      # horizontal acceleration
+    mpc_R_acc_z:     1.5      # vertical acceleration
+    mpc_R_yaw_rate:  0.1      # yaw rate
+    mpc_R_jerk:      0.3      # delta-u smoothness
+
+    # Obstacle avoidance (Gaussian grid soft penalty)
+    mpc_W_obs: 100.0           # weight on occupancy probability in cost
+
+    # Half-space obstacle avoidance from raw LiDAR points
+    # For each selected LiDAR hit p_obs within obs_check_radius:
+    #   n = (drone_xy - p_obs) / ||drone_xy - p_obs||   (outward normal)
+    #   penalty = W_obs_pts * max(0, d_safe_pts - n^T*(X_k - p_obs))^2
+    # This directly penalises predicted states that encroach on obstacle points.
+    mpc_d_safe_pts:          0.5    # [m]  safety clearance from each LiDAR point
+    mpc_W_obs_pts:          50.0    # penalty weight (higher → stronger avoidance)
+    mpc_max_obs_constraints: 15     # max LiDAR points used per solve (nearest first)
+    mpc_obs_check_radius:    3.0    # [m]  only points within this radius are used
+
+    # IPOPT solver options
+    mpc_max_iter:   100       # maximum IPOPT iterations per solve
+    mpc_warm_start: true      # reuse previous solution as initial guess
+
+    # Rate at which the MPC node runs [Hz]
+    mpc_rate_hz: 20.0
+
+    # Lookahead distance [m] — the MPC walks its predicted trajectory and picks
+    # the first state >= this distance from the drone as the PID setpoint.
+    # Must be >> v_ref * mpc_dt (= 0.1 m) to prevent oscillation.
+    # Rule of thumb: ~ pos_vel_limit (1.2 m/s) / mpc_rate_hz (20 Hz) * 3 ≈ 0.18 m
+    # Use 1.5 m for a comfortable margin.
+    mpc_lookahead_dist: 1.5

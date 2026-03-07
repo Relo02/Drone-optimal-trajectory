@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8000/api/robot/state)",
+      "Bash(python3 -c \"import frankapy; print\\(''frankapy OK''\\)\")",
+      "Bash(python3 -c \"import franky; print\\(''franky OK'', franky.__version__\\)\")",
+      "Read(//home/lorenzo/franka-robot/**)",
+      "Bash(curl -s http://localhost:8000/api/camera/state)",
+      "Bash(lsusb)",
+      "Read(//dev/**)"
+    ]
+  }
+}

@@ -44,7 +44,7 @@ class MPCVisualizer(Node):
         super().__init__('mpc_visualizer')
 
         # Declare parameters
-        self.declare_parameter('goal_x', 10.0)
+        self.declare_parameter('goal_x', 20.0)
         self.declare_parameter('goal_y', 1.0)
         self.declare_parameter('update_rate_hz', 5.0)
 
@@ -65,7 +65,9 @@ class MPCVisualizer(Node):
         self.create_subscription(
             Path, '/mpc/predicted_path', self._path_cb, 10)
         self.create_subscription(
-            Float32MultiArray, '/mpc/grid_data', self._grid_cb, 10)
+            Path, '/planned_path', self._astar_path_cb, 10)
+        self.create_subscription(
+            Float32MultiArray, '/grid_map', self._grid_cb, 10)
         self.create_subscription(
             Float64MultiArray, '/mpc/diagnostics', self._diag_cb, 10)
         self.create_subscription(
@@ -157,7 +159,8 @@ class MPCVisualizer(Node):
     def _lidar_cb(self, msg: PointCloud2):
         pts = list(point_cloud2.read_points(msg, field_names=('x', 'y'), skip_nans=True))
         if len(pts) > 0:
-            self.lidar_pts = np.array(pts)
+            # Ensure we always have a 2D array with shape (N, 2)
+            self.lidar_pts = np.array(pts).reshape(-1, 2)
         else:
             self.lidar_pts = None
 
@@ -254,7 +257,13 @@ class MPCVisualizer(Node):
 
         # ── 2. LiDAR points ──
         if self.lidar_pts is not None and len(self.lidar_pts) > 0:
-            self._lidar_sc.set_offsets(self.lidar_pts)
+            # Ensure proper shape before setting offsets
+            if self.lidar_pts.ndim == 2 and self.lidar_pts.shape[1] == 2:
+                self._lidar_sc.set_offsets(self.lidar_pts)
+            else:
+                # Reshape if needed
+                pts_reshaped = np.array(self.lidar_pts).reshape(-1, 2)
+                self._lidar_sc.set_offsets(pts_reshaped)
         else:
             self._lidar_sc.set_offsets(np.empty((0, 2)))
 

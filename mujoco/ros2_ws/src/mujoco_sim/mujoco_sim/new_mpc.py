@@ -1,9 +1,9 @@
 """
 New MPC Local Path Planner for drone navigation (new_mpc.py).
 
-Dynamics: 2D double-integrator + yaw
-  State:   x = [px, py, vx, vy, yaw]   (5)
-  Control: u = [ax, ay, yaw_rate]       (3)
+Dynamics: 2D double-integrator (simplified, yaw fixed at 0)
+  State:   x = [px, py, vx, vy]         (4)
+  Control: u = [ax, ay]               (2)
 
 Solver: CasADi + IPOPT (interior-point NLP solver)
 
@@ -38,19 +38,17 @@ class NewMPCConfig:
 
     # ── Dynamics limits ──
     v_max: float = 5.0               # max velocity  [m/s], before: 2.5
-    a_max: float = 0.1               # max acceleration [m/s²], before: 0.5
-    yaw_rate_max: float = 1.0        # max yaw rate [rad/s]
+    a_max: float = 0.2               # max acceleration [m/s²], before: 0.5
 
     # ── Waypoint sequencing ──
     waypoint_threshold: float = 0.3  # advance to next A* waypoint when within this distance [m]
+    waypoint_tolerance: float = 0.5  # waypoint reaching tolerance to prevent MPC oscillation [m]
 
     # ── Cost weights ──
     Q_pos: float = 400.0              # position tracking weight
     Q_vel: float = 1.0               # velocity tracking weight
-    Q_yaw: float = 0.5               # heading tracking weight
     Q_terminal: float = 10.0          # terminal weight multiplier, before: 3.0
-    R_acc: float = 0.8               # acceleration effort penalty
-    R_yaw_rate: float = 0.05         # yaw-rate effort penalty
+    R_acc: float = 0.8              # acceleration effort penalty
     R_jerk: float = 10.0              # jerk (Δu) smoothness penalty
 
     # ── Obstacle avoidance ──
@@ -185,11 +183,11 @@ def _build_grid_interp(grid_map: GaussianGridMap) -> Optional[ca.Function]:
 class NewMPCResult:
     """Solver output from one NewMPCPlanner.solve() call."""
     success: bool
-    u_opt: np.ndarray               # optimal control sequence  (N, 3)
-    x_pred: np.ndarray              # predicted state trajectory (N+1, 5)
+    u_opt: np.ndarray               # optimal control sequence  (N, 2)
+    x_pred: np.ndarray              # predicted state trajectory (N+1, 4)
     cost: float
     solve_time_ms: float
-    first_control: np.ndarray       # u_opt[0]  →  [ax, ay, yaw_rate]
+    first_control: np.ndarray       # u_opt[0]  →  [ax, ay]
 
 
 # ═══════════════════════════════════════════════
@@ -211,14 +209,14 @@ class NewMPCPlanner:
         cmd     = result.first_control   # [ax, ay, yaw_rate]
     """
 
-    NX = 5   # [px, py, vx, vy, yaw]
-    NU = 3   # [ax, ay, yaw_rate]
+    NX = 4   # [px, py, vx, vy]
+    NU = 2   # [ax, ay]
 
     def __init__(self, config: Optional[NewMPCConfig] = None):
         self.cfg = config or NewMPCConfig()
 
         # A* waypoint sequencer (advances index when close to current target)
-        self.sequencer = WaypointSequencer(threshold=self.cfg.waypoint_threshold)
+        self.sequencer = WaypointSequencer(threshold=self.cfg.waypoint_tolerance)
 
         # Full A* path stored as 2-D xy points for terminal path constraint
         self._full_path_xy: List[np.ndarray] = []
@@ -344,11 +342,11 @@ class NewMPCPlanner:
         Build a straight-line reference from the current state to goal_xy.
 
         Args:
-            x0:      current state [px, py, vx, vy, yaw]
+            x0:      current state [px, py, vx, vy]
             goal_xy: current target A* waypoint [x, y]
 
         Returns:
-            x_ref: (N+1, 5)
+            x_ref: (N+1, 4)
         """
         N, dt = self.cfg.N, self.cfg.dt
         pos_xy = x0[:2]
@@ -359,11 +357,9 @@ class NewMPCPlanner:
             x_ref = np.zeros((N + 1, self.NX))
             for k in range(N + 1):
                 x_ref[k, :2] = goal_xy
-                x_ref[k, 4]  = x0[4]
             return x_ref
 
         direction = diff / dist
-        goal_yaw  = float(np.arctan2(diff[1], diff[0]))
         # Cruise at v_max, capped to reach goal within horizon
         speed = min(self.cfg.v_max, dist / (N * dt))
 
@@ -374,7 +370,6 @@ class NewMPCPlanner:
             x_ref[k, 1] = pos_xy[1] + direction[1] * travel
             x_ref[k, 2] = direction[0] * speed
             x_ref[k, 3] = direction[1] * speed
-            x_ref[k, 4] = goal_yaw
         return x_ref
 
     # ─────────────────────────────────────────
@@ -385,7 +380,6 @@ class NewMPCPlanner:
         self,
         pos_xy: np.ndarray,
         vel_xy: np.ndarray,
-        yaw: float,
     ) -> NewMPCResult:
         """
         Formulate and solve the MPC optimisation problem.
@@ -407,7 +401,7 @@ class NewMPCPlanner:
         N, dt = cfg.N, cfg.dt
         NX, NU = self.NX, self.NU
 
-        x0 = np.array([pos_xy[0], pos_xy[1], vel_xy[0], vel_xy[1], yaw])
+        x0 = np.array([pos_xy[0], pos_xy[1], vel_xy[0], vel_xy[1]])
 
         # Advance to next waypoint if close enough
         self.sequencer.advance_if_close(pos_xy)
@@ -472,10 +466,10 @@ class NewMPCPlanner:
         Sigma_obs = opti.variable(N) if _has_obs_hs else None
 
         # ── Weight matrices ─────────────────────
-        q = np.array([cfg.Q_pos, cfg.Q_pos, cfg.Q_vel, cfg.Q_vel, cfg.Q_yaw])
+        q = np.array([cfg.Q_pos, cfg.Q_pos, cfg.Q_vel, cfg.Q_vel])
         Q   = np.diag(q)
         Q_t = np.diag(q * cfg.Q_terminal)
-        R   = np.diag([cfg.R_acc, cfg.R_acc, cfg.R_yaw_rate])
+        R   = np.diag([cfg.R_acc, cfg.R_acc])
 
         # ── Objective ───────────────────────────
         cost = 0.0
@@ -533,13 +527,12 @@ class NewMPCPlanner:
 
         opti.minimize(cost)
 
-        # ── Dynamics constraints (double-integrator + yaw) ──
+        # ── Dynamics constraints (double-integrator) ──
         for k in range(N):
             opti.subject_to(X[0, k+1] == X[0, k] + X[2, k] * dt + 0.5 * U[0, k] * dt**2)
             opti.subject_to(X[1, k+1] == X[1, k] + X[3, k] * dt + 0.5 * U[1, k] * dt**2)
             opti.subject_to(X[2, k+1] == X[2, k] + U[0, k] * dt)
             opti.subject_to(X[3, k+1] == X[3, k] + U[1, k] * dt)
-            opti.subject_to(X[4, k+1] == X[4, k] + U[2, k] * dt)
 
         # ── Initial state ────────────────────────
         opti.subject_to(X[:, 0] == x0)
@@ -547,7 +540,6 @@ class NewMPCPlanner:
         # ── Control box constraints ──────────────
         opti.subject_to(opti.bounded(-cfg.a_max,         U[0, :], cfg.a_max))
         opti.subject_to(opti.bounded(-cfg.a_max,         U[1, :], cfg.a_max))
-        opti.subject_to(opti.bounded(-cfg.yaw_rate_max,  U[2, :], cfg.yaw_rate_max))
 
         # ── Velocity magnitude constraint ────────
         for k in range(N + 1):
@@ -727,8 +719,7 @@ class NewMPCDroneController:
         # Cached MPC horizontal command (written by MPC thread, read by main)
         self._cached_ax       = 0.0
         self._cached_ay       = 0.0
-        self._cached_yaw_rate = 0.0
-        self._desired_yaw     = 0.0  # integrated in MPC thread with wall-clock time
+        self._desired_yaw     = 0.0  # Fixed at zero for simplified MPC
 
         # State snapshot (written by main thread, read by MPC thread)
         self._snap_pos  = np.zeros(3)
@@ -788,7 +779,7 @@ class NewMPCDroneController:
           4. Update cached command (fast, locked).
           5. Sleep remainder of the MPC period.
         """
-        from scipy.spatial.transform import Rotation as R_scipy
+        # Simplified MPC: no longer need yaw computation
 
         cfg   = self.mpc_planner.cfg
         a_max = cfg.a_max
@@ -801,13 +792,6 @@ class NewMPCDroneController:
             actual_dt = min(t_now - t_prev, 1.0)
             t_prev = t_now
 
-            # ── 0. Integrate yaw with real elapsed time ──
-            with self._cmd_lock:
-                self._desired_yaw += self._cached_yaw_rate * actual_dt
-                self._desired_yaw = float(np.arctan2(
-                    np.sin(self._desired_yaw), np.cos(self._desired_yaw)
-                ))
-
             # ── 1. Snapshot state ────────────────────────
             with self._state_lock:
                 pos  = self._snap_pos.copy()
@@ -816,10 +800,7 @@ class NewMPCDroneController:
             with self._cmd_lock:
                 lidar_pts = self._lidar_pts   # may be None
 
-            # Compute yaw from quaternion
-            scipy_quat = [quat[1], quat[2], quat[3], quat[0]]
-            euler = R_scipy.from_quat(scipy_quat).as_euler('xyz', degrees=False)
-            yaw    = float(euler[2])
+            # Extract 2D position and velocity for simplified MPC
             pos_xy = pos[:2].copy()
             vel_xy = vel[:2].copy()
 
@@ -832,23 +813,21 @@ class NewMPCDroneController:
 
             # ── 3. Solve MPC (no lock held) ──────────────
             try:
-                result = self.mpc_planner.solve(pos_xy, vel_xy, yaw)
+                result = self.mpc_planner.solve(pos_xy, vel_xy)  # removed yaw parameter
                 self.last_mpc_result = result
 
                 if result.success:
-                    ax, ay, yr = result.first_control
+                    ax, ay = result.first_control  # [ax, ay] (2 elements now)
                     _fail_count = 0
                 else:
                     # Non-converged best iterate: brake to stop drift
                     _fail_count += 1
                     ax = float(np.clip(-2.0 * vel[0], -a_max, a_max))
                     ay = float(np.clip(-2.0 * vel[1], -a_max, a_max))
-                    yr = 0.0
             except Exception:
                 _fail_count += 1
                 ax = float(np.clip(-2.0 * vel[0], -a_max, a_max))
                 ay = float(np.clip(-2.0 * vel[1], -a_max, a_max))
-                yr = 0.0
 
             # Reset warm-start after repeated failures
             if _fail_count >= 3:
@@ -860,7 +839,7 @@ class NewMPCDroneController:
             with self._cmd_lock:
                 self._cached_ax       = float(ax)
                 self._cached_ay       = float(ay)
-                self._cached_yaw_rate = float(yr)
+                self._desired_yaw     = 0.0  # Fixed at zero
 
             # ── 5. Sleep remainder of MPC period ─────────
             elapsed    = time.perf_counter() - t_now

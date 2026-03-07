@@ -13,7 +13,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 import numpy as np
 
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float32MultiArray
 from geometry_msgs.msg import PoseStamped, Point
 from nav_msgs.msg import Path
 from sensor_msgs.msg import PointCloud2
@@ -96,6 +96,7 @@ class AStarPlannerNode(Node):
 
         # Publishers
         self.path_pub = self.create_publisher(Path, '/planned_path', 10)
+        self.grid_pub = self.create_publisher(Float32MultiArray, '/grid_map', 10)
 
         # Timer for periodic replanning
         replan_period = 1.0 / self.replan_rate
@@ -105,6 +106,7 @@ class AStarPlannerNode(Node):
         self.get_logger().info(f'  Grid resolution: {self.grid_resolution}m')
         self.get_logger().info(f'  Obstacle threshold: {self.obstacle_threshold}')
         self.get_logger().info(f'  Replan rate: {self.replan_rate}Hz')
+        self.get_logger().info('  Publishing: /planned_path, /grid_map')
 
     def pose_callback(self, msg: PoseStamped):
         """Handle current drone pose updates."""
@@ -217,6 +219,28 @@ class AStarPlannerNode(Node):
         self.path_published = True  # Don't replan until new goal
 
         self.get_logger().info(f'Published path with {len(path_world)} waypoints')
+        
+        # Also publish the grid map
+        self.publish_grid_map()
+
+    def publish_grid_map(self):
+        """Publish the current Gaussian grid map."""
+        if self.grid_map.gmap is None:
+            return
+            
+        msg = Float32MultiArray()
+        # Pack grid parameters: minx, miny, resolution, width, height, then flattened data
+        msg.data = [
+            float(self.grid_map.minx),
+            float(self.grid_map.miny), 
+            float(self.grid_map.xyreso),
+            float(self.grid_map.xw),
+            float(self.grid_map.yw)
+        ]
+        # Flatten grid map data (row-major order)
+        msg.data.extend(self.grid_map.gmap.flatten().astype(np.float32).tolist())
+        
+        self.grid_pub.publish(msg)
 
 
 def main(args=None):
