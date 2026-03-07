@@ -26,32 +26,34 @@ The stack combines a real-time **Gaussian occupancy grid**, a **rolling-horizon 
 
 ## 1. System Architecture
 
-```
- ┌──────────────────────────────────────────────────────────┐
- │                    skydio_sim_node                       │
- │  MuJoCo physics  +  3-D LiDAR  +  Cascaded PID          │
- │                                                          │
- │  /skydio/pose  ──────────────────────────────────────►  │
- │  /skydio/scan3d ─────────────────────────────────────►  │
- │                                                          │
- │  ◄─────────────────────────────────── /goal_pose        │
- └──────────────────────────────────────────────────────────┘
-          │  /skydio/pose                │  /goal_pose
-          │  /skydio/scan3d             │
-          ▼                             │
- ┌───────────────────┐       ┌──────────────────────────┐
- │   a_star_node     │       │        mpc_node           │
- │                   │       │                           │
- │  FixedGaussian    │       │  FixedGaussianGridMap     │
- │  GridMap          │       │  (own copy, same params)  │
- │  + AStarPlanner   │       │  MPCTracker               │
- │                   │       │  (CasADi / IPOPT)         │
- │  /a_star/path ────┼──────►│                           │
- │  /a_star/grid_raw │       │  /mpc/predicted_path ──►  │
- │  /a_star/         │       │  /mpc/next_setpoint ───►  │
- │  occupancy_grid   │       │  /mpc/diagnostics ─────►  │
- └───────────────────┘       └──────────────────────────┘
-```
+graph TD
+    subgraph skydio_sim_node["skydio_sim_node\nMuJoCo physics + 3-D LiDAR + Cascaded PID"]
+        SIM["simulation loop"]
+    end
+
+    subgraph a_star_node["a_star_node"]
+        ASTAR["FixedGaussianGridMap\n+ AStarPlanner"]
+    end
+
+    subgraph mpc_node["mpc_node"]
+        MPC["FixedGaussianGridMap (own copy)\nMPCTracker (CasADi / IPOPT)"]
+    end
+
+    skydio_sim_node -- "/skydio/pose" --> a_star_node
+    skydio_sim_node -- "/skydio/scan3d" --> a_star_node
+    skydio_sim_node -- "/skydio/pose" --> mpc_node
+    skydio_sim_node -- "/skydio/scan3d" --> mpc_node
+
+    a_star_node -- "/a_star/path" --> mpc_node
+    a_star_node -- "/a_star/grid_raw" --> mpc_node
+    a_star_node -- "/a_star/occupancy_grid" --> mpc_node
+
+    mpc_node -- "/mpc/predicted_path" --> OUT1((" "))
+    mpc_node -- "/mpc/next_setpoint" --> OUT2((" "))
+    mpc_node -- "/mpc/diagnostics" --> OUT3((" "))
+
+    GOAL(["/goal_pose"]) --> skydio_sim_node
+
 
 **Data flow summary**
 
