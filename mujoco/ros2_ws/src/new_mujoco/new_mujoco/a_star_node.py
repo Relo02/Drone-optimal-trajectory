@@ -5,13 +5,13 @@ Architecture
 ------------
   Subscribes:
     /skydio/pose    PoseStamped  — drone position and orientation
-    /skydio/scan3d  PointCloud2  — 3-D lidar hits (world frame)
+    /skydio/scan3d  PointCloud   — 3-D lidar hits (world frame)
     /global_goal    PoseStamped  — runtime global goal override
 
   Publishes:
-    /a_star/path            nav_msgs/Path           — local A* path to local goal
-    /a_star/local_goal      geometry_msgs/PoseStamped — current local goal (grid-edge point)
-    /a_star/occupancy_grid  nav_msgs/OccupancyGrid  — Gaussian grid map (for Foxglove)
+    /a_star/path            nav_msgs/Path              — local A* path to local goal
+    /a_star/local_goal      geometry_msgs/PoseStamped  — current local goal (grid-edge point)
+    /a_star/occupancy_grid  nav_msgs/OccupancyGrid     — Gaussian grid map (for Foxglove)
     /a_star/grid_raw        std_msgs/Float32MultiArray — raw float32 grid + metadata (for MPC node)
     TF: world -> drone_base_link  (rebroadcast from /skydio/pose)
 
@@ -80,13 +80,13 @@ class AStarNode(Node):
 
         # ── Algorithm objects ─────────────────────────────────────────
         self._grid_map = FixedGaussianGridMap(
-            reso=float(self.get_parameter('grid_reso').value),
-            half_width=float(self.get_parameter('grid_half_width').value),
-            std=float(self.get_parameter('grid_std').value),
+            reso = float(self.get_parameter('grid_reso').value),
+            half_width = float(self.get_parameter('grid_half_width').value),
+            std = float(self.get_parameter('grid_std').value),
         )
         self._planner = AStarPlanner(
-            obstacle_threshold=float(self.get_parameter('obstacle_threshold').value),
-            obstacle_cost_weight=float(self.get_parameter('obstacle_cost_weight').value),
+            obstacle_threshold = float(self.get_parameter('obstacle_threshold').value),
+            obstacle_cost_weight = float(self.get_parameter('obstacle_cost_weight').value),
         )
 
         # ── State ─────────────────────────────────────────────────────
@@ -97,9 +97,9 @@ class AStarNode(Node):
         # ── TF broadcaster ────────────────────────────────────────────
         self._tf_broadcaster = TransformBroadcaster(self)
 
-        # ── QoS ───────────────────────────────────────────────────────
+        # ── QoS (quality of service) ──────────────────────────────────
         sensor_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.BEST_EFFORT,   # LIDAR can drop messages, no need for reliable delivery
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
@@ -117,8 +117,9 @@ class AStarNode(Node):
 
         # ── Replan timer ──────────────────────────────────────────────
         rate = float(self.get_parameter('replan_rate_hz').value)
-        self.create_timer(1.0 / rate, self._replan_cb)
+        self.create_timer(1.0 / rate, self._replan_cb)  # timer callback for replanning at fixed frequency
 
+        # ── Print some informations and topics ────────────────────────
         self.get_logger().info(
             f'A* node ready | goal=({self._goal[0]:.1f}, {self._goal[1]:.1f}, {self._goal[2]:.1f})'
             f' | grid={2*self._grid_map.half_width:.0f}m × {2*self._grid_map.half_width:.0f}m'
@@ -138,10 +139,10 @@ class AStarNode(Node):
 
     # ── Callbacks ─────────────────────────────────────────────────────
 
-    def _pose_cb(self, msg: PoseStamped):
+    def _pose_cb(self, msg: PoseStamped):  # receive the drone pose 
         self._pose = msg
 
-        # Rebroadcast pose as TF  world → drone_base_link
+        # Rebroadcast pose as TF: world → drone_base_link
         t = TransformStamped()
         t.header = msg.header
         t.child_frame_id = 'drone_base_link'
@@ -151,7 +152,7 @@ class AStarNode(Node):
         t.transform.rotation = msg.pose.orientation
         self._tf_broadcaster.sendTransform(t)
 
-    def _goal_cb(self, msg: PoseStamped):
+    def _goal_cb(self, msg: PoseStamped):  # receive a new global goal at runtime
         self._goal = np.array([
             msg.pose.position.x,
             msg.pose.position.y,
@@ -159,16 +160,16 @@ class AStarNode(Node):
         ])
         self._goal_reached = False
         self.get_logger().info(
-            f'Global goal updated: ({self._goal[0]:.2f}, {self._goal[1]:.2f}, {self._goal[2]:.2f})'
+            f'Global goal updated: ({self._goal[0]:.2f}, {self._goal[1]:.2f}, {self._goal[2]:.2f})'  # log new goal
         )
 
-    def _lidar_cb(self, msg: PointCloud2):
+    def _lidar_cb(self, msg: PointCloud2):  # receive the LiDAR 3D points and convert them to numpy array
         pts = []
         for p in point_cloud2.read_points(msg, field_names=('x', 'y', 'z'), skip_nans=True):
             pts.append([p[0], p[1], p[2]])
 
         if not pts:
-            self._lidar_points = None
+            self._lidar_points = None   # in case of empty point cloud
             return
 
         arr = np.array(pts, dtype=float)
@@ -178,15 +179,15 @@ class AStarNode(Node):
             px = self._pose.pose.position.x
             py = self._pose.pose.position.y
             dists = np.hypot(arr[:, 0] - px, arr[:, 1] - py)
-            arr = arr[dists <= self._max_lidar_range]
+            arr = arr[dists <= self._max_lidar_range]  # keep points within max_lidar_range
 
-        self._lidar_points = arr if len(arr) > 0 else None
+        self._lidar_points = arr if len(arr) > 0 else None  
 
     # ── Replan timer ──────────────────────────────────────────────────
 
     def _replan_cb(self):
         if self._pose is None:
-            return
+            return  # no pose received yet, so exit
 
         pos   = self._pose.pose.position
         drone = np.array([pos.x, pos.y, pos.z])
@@ -197,7 +198,7 @@ class AStarNode(Node):
                 self.get_logger().info(
                     f'[A*] Global goal reached! dist={dist_to_goal:.2f} m'
                 )
-                self._goal_reached = True
+                self._goal_reached = True  # if within a radius from the goal, goal reached and exit
             return
         self._goal_reached = False
 

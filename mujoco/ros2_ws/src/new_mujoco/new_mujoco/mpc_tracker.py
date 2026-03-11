@@ -6,7 +6,7 @@ Design
 - Tracks a path produced by AStarPlanner.
   Path waypoints may be 2-D (x, y) or 3-D (x, y, z).
   When z is absent from the path, the MPC tracks the constant altitude
-  passed via the `z_ref` argument of solve().
+  passed via the 'z_ref' argument of solve().
 
 - Uses a 3-D double-integrator + yaw dynamics model.
 
@@ -18,7 +18,7 @@ Design
 
 - MPCResult.next_position  gives [x, y, z] one step ahead — direct PID setpoint.
 
-State    x  = [px, py, pz, vx, vy, vz, yaw]   (NX = 7)
+State    x  = [px, py, pz, vx, vy, vz, yaw]     (NX = 7)
 Control  u  = [ax, ay, az, yaw_rate]            (NU = 4)
 
 Euler integration over dt:
@@ -78,7 +78,7 @@ class MPCConfig:
     R_acc_xy: float = 1.0           # horizontal acceleration effort
     R_acc_z: float = 1.5            # vertical acceleration effort
     R_yaw_rate: float = 0.1         # yaw-rate effort
-    R_jerk: float = 0.3             # delta-u smoothness
+    R_jerk: float = 0.3             # delta-u smoothness (jerk = d(acceleration)/dt)
 
     # Obstacle avoidance (applied to x-y plane)
     W_obs: float = 30.0             # Gaussian grid soft penalty weight
@@ -124,7 +124,7 @@ class MPCResult:
 
     @property
     def predicted_z(self) -> np.ndarray:
-        """(N+1,) predicted altitude."""
+        """(N+1, 1) predicted altitude."""
         return self.x_pred[:, 2]
 
 
@@ -186,15 +186,15 @@ class MPCTracker:
         if len(pts_2d) == 0:
             return np.empty((0, 2))
 
-        dists = np.linalg.norm(pts_2d - drone_xy, axis=1)
-        mask = dists < self.cfg.obs_check_radius
+        dists = np.linalg.norm(pts_2d - drone_xy, axis=1)  # distances from drone to each obstacle point
+        mask = dists < self.cfg.obs_check_radius  # only consider points within a check radius
         if not np.any(mask):
             return np.empty((0, 2))
 
-        pts_close  = pts_2d[mask]
-        dist_close = dists[mask]
-        n_sel = min(len(pts_close), self.cfg.max_obs_constraints)
-        idx   = np.argsort(dist_close)[:n_sel]
+        pts_close  = pts_2d[mask]  # select only points within the check radius
+        dist_close = dists[mask]  # corresponding distances
+        n_sel = min(len(pts_close), self.cfg.max_obs_constraints)  # select points with the lower distances
+        idx   = np.argsort(dist_close)[:n_sel]  # take indices of closest points 
         return pts_close[idx]
 
     # ------------------------------------------------------------------
@@ -210,13 +210,14 @@ class MPCTracker:
             self._grid_interp = None
             return
 
-        xw, yw = grid_map.gmap.shape
-        x_grid = (np.arange(xw) * grid_map.reso + grid_map.minx).tolist()
-        y_grid = (np.arange(yw) * grid_map.reso + grid_map.miny).tolist()
-        data_flat = grid_map.gmap.ravel(order='F').tolist()   # column-major for CasADi
+        xw, yw = grid_map.gmap.shape  # grid dimensions (cells)
+        x_grid = (np.arange(xw) * grid_map.reso + grid_map.minx).tolist()  # convert the grid array (if 10 cells is [0,1,...,9]) rescaling it by the  
+        y_grid = (np.arange(yw) * grid_map.reso + grid_map.miny).tolist()  # resolution, then sum the offset of the grid minx, finally convert to NumPy array
+        data_flat = grid_map.gmap.ravel(order='F').tolist()   # flatten the final 2D array (x and y) following the column-major syntax expected by CasADi
 
         self._grid_interp = ca.interpolant(
-            'obs_cost', 'bspline', [x_grid, y_grid], data_flat
+            'obs_cost', 'bspline', [x_grid, y_grid], data_flat  # build a CasADi bspline interpolant of the occupancy grid, it is a function differentiable 2-times  
+
         )
 
     # ------------------------------------------------------------------
@@ -244,7 +245,7 @@ class MPCTracker:
         x_ref : (N+1, NX)
         """
         N, dt, v_ref = self.cfg.N, self.cfg.dt, self.cfg.v_ref
-        x_ref = np.zeros((N + 1, self.NX))
+        x_ref = np.zeros((N + 1, self.NX))  # initialise state array
 
         if not path_world or len(path_world) < 2:
             # No path: hold current pose
@@ -258,47 +259,47 @@ class MPCTracker:
         path_xy = path[:, :2]   # (M, 2)
 
         # Arc-length parameterisation along horizontal plane
-        diffs_xy = np.diff(path_xy, axis=0)           # (M-1, 2)
-        seg_len  = np.hypot(diffs_xy[:, 0], diffs_xy[:, 1])  # (M-1,)
-        arc      = np.concatenate([[0.0], np.cumsum(seg_len)])
-        total_arc = arc[-1]
+        diffs_xy = np.diff(path_xy, axis=0)   # vectors between consecutive waypoints (M-1, 2)
+        seg_len  = np.hypot(diffs_xy[:, 0], diffs_xy[:, 1])  # euclidean distances between waypoints (M-1,)
+        arc      = np.concatenate([[0.0], np.cumsum(seg_len)])  # cumulative arc length (0, s1, s1+s2, ...)
+        total_arc = arc[-1]  # total path length
 
         if has_z:
             diffs_z = np.diff(path[:, 2])  # (M-1,)
 
         # Find closest waypoint to current drone position (horizontal only)
         drone_xy = drone_state[:2]
-        i_closest = int(np.argmin(np.linalg.norm(path_xy - drone_xy, axis=1)))
-        s0 = arc[i_closest]
+        i_closest = int(np.argmin(np.linalg.norm(path_xy - drone_xy, axis=1)))  # index of closest waypoint wrt the drone
+        s0 = arc[i_closest]  # starting point
 
         for k in range(N + 1):
-            s_k = min(s0 + v_ref * k * dt, total_arc)
+            s_k = min(s0 + v_ref * k * dt, total_arc)  # proceed along the arc at v_ref = constant 
 
-            idx = int(np.searchsorted(arc, s_k, side='right')) - 1
-            idx = np.clip(idx, 0, len(path_xy) - 2)
+            idx = int(np.searchsorted(arc, s_k, side='right')) - 1  # find the index for s_k
+            idx = np.clip(idx, 0, len(path_xy) - 2)  # ensure idx is within valid range (not out of bounds)
 
-            seg_l = seg_len[idx]
-            t = (s_k - arc[idx]) / (seg_l + 1e-9)
+            seg_l = seg_len[idx]  # length of the current segment
+            t = (s_k - arc[idx]) / (seg_l + 1e-9)  # normalised position along the segment, add small epsilon to avoid division by zero
             t = np.clip(t, 0.0, 1.0)
 
             # Reference x, y
-            pos_xy = path_xy[idx] + t * diffs_xy[idx]
-            seg_dir = diffs_xy[idx] / (seg_l + 1e-9)
-            yaw_k = np.arctan2(seg_dir[1], seg_dir[0])
+            pos_xy = path_xy[idx] + t * diffs_xy[idx]  # linear interpolation between the two consecutive waypoints idx and idx+1
+            seg_dir = diffs_xy[idx] / (seg_l + 1e-9)  # unit direction vector of the segment
+            yaw_k = np.arctan2(seg_dir[1], seg_dir[0])  # yaw aligned with the segment direction
 
             # Reference z
             if has_z:
-                ref_z = path[idx, 2] + t * diffs_z[idx]
+                ref_z = path[idx, 2] + t * diffs_z[idx]  # linear interpolation of z between the two consecutive waypoints
             else:
                 ref_z = z_ref
 
-            x_ref[k, 0] = pos_xy[0]
-            x_ref[k, 1] = pos_xy[1]
-            x_ref[k, 2] = ref_z
+            x_ref[k, 0] = pos_xy[0]            # x
+            x_ref[k, 1] = pos_xy[1]            # y
+            x_ref[k, 2] = ref_z                # z
             x_ref[k, 3] = seg_dir[0] * v_ref   # vx
             x_ref[k, 4] = seg_dir[1] * v_ref   # vy
             x_ref[k, 5] = 0.0                  # vz reference is zero (cruise)
-            x_ref[k, 6] = yaw_k
+            x_ref[k, 6] = yaw_k                # yaw
 
         return x_ref
 
@@ -335,7 +336,7 @@ class MPCTracker:
         NX, NU = self.NX, self.NU
 
         x0 = np.asarray(drone_state, dtype=float)
-        x_ref = self._build_reference(x0, path_world, z_ref)
+        x_ref = self._build_reference(x0, path_world, z_ref)  # reference trajectory from A* path
 
         # Select nearby LiDAR points for half-space penalty
         drone_xy_np = x0[:2]
@@ -344,20 +345,20 @@ class MPCTracker:
         else:
             obs_pts = np.empty((0, 2))
 
-        # Precompute outward normals (drone → away from each obstacle)
+        # Precompute outward normals (obstacle → drone, pointing away from each obstacle)
         # n_i = (drone_xy - pt_i) / ||drone_xy - pt_i||
         half_space = []   # list of (ox, oy, nx, ny)
         for pt in obs_pts:
             diff = drone_xy_np - pt
             d = float(np.linalg.norm(diff))
             if d < 1e-6:
-                continue
+                continue  # skip points that are too close to the drone (due to sensor noise)
             half_space.append((float(pt[0]), float(pt[1]), diff[0] / d, diff[1] / d))
 
         # ── CasADi Opti ──────────────────────────────────────────────
         opti = ca.Opti()
-        X = opti.variable(NX, N + 1)   # states  — columns are time steps
-        U = opti.variable(NU, N)        # controls
+        X = opti.variable(NX, N + 1)   # states — columns are time steps
+        U = opti.variable(NU, N)       # controls (for each time step)
 
         # Weight matrices
         q = np.array([
@@ -374,22 +375,22 @@ class MPCTracker:
 
         for k in range(N):
             # State tracking
-            e = X[:, k] - x_ref[k]
+            e = X[:, k] - x_ref[k]  # penalize distance from reference trajectory
             cost += ca.mtimes([e.T, Q, e])
 
             # Control effort
-            u_k = U[:, k]
+            u_k = U[:, k]  # penalize control effort (acceleration and yaw rate)
             cost += ca.mtimes([u_k.T, R, u_k])
 
             # Jerk (smoothness)
             if k > 0:
-                du = U[:, k] - U[:, k - 1]
+                du = U[:, k] - U[:, k - 1]  # penalize big changes in control inputs
                 cost += cfg.R_jerk * ca.dot(du, du)
 
             # Soft obstacle cost from Gaussian grid map (x-y plane only)
             if self._grid_interp is not None:
-                pos_xy = ca.vertcat(X[0, k], X[1, k])
-                cost += cfg.W_obs * self._grid_interp(pos_xy)
+                pos_xy = ca.vertcat(X[0, k], X[1, k])  
+                cost += cfg.W_obs * self._grid_interp(pos_xy)  # penalize proximity to obstacles for actual position
 
             # Half-space soft penalty: push predicted state away from each nearby
             # LiDAR point.  For obstacle at (ox, oy) with outward normal (nx, ny):
@@ -398,7 +399,7 @@ class MPCTracker:
             # is closer than d_safe to the obstacle along the normal direction.
             for ox, oy, nx, ny in half_space:
                 signed_dist = nx * (X[0, k] - ox) + ny * (X[1, k] - oy)
-                cost += cfg.W_obs_pts * ca.fmax(0.0, cfg.d_safe_pts - signed_dist) ** 2
+                cost += cfg.W_obs_pts * ca.fmax(0.0, cfg.d_safe_pts - signed_dist) ** 2  # penalize proximity of next position to any obstacle
 
         # Terminal cost
         e_T = X[:, N] - x_ref[N]
@@ -434,7 +435,7 @@ class MPCTracker:
         # Initial state
         opti.subject_to(X[:, 0] == x0)
 
-        # ── Box constraints on controls ──────────────────────────────
+        # ── Box constraints on controls (limit accelerations and yaw rate)
         for k in range(N):
             opti.subject_to(opti.bounded(-cfg.a_max_xy,      U[0, k],  cfg.a_max_xy))
             opti.subject_to(opti.bounded(-cfg.a_max_xy,      U[1, k],  cfg.a_max_xy))
@@ -444,9 +445,9 @@ class MPCTracker:
         # ── Speed constraints ────────────────────────────────────────
         for k in range(N + 1):
             # Horizontal speed
-            opti.subject_to(X[3, k]**2 + X[4, k]**2 <= cfg.v_max_xy**2)
+            opti.subject_to(X[3, k]**2 + X[4, k]**2 <= cfg.v_max_xy**2)  # (vx^2 + vy^2) limited to v_max_xy^2
             # Vertical speed
-            opti.subject_to(opti.bounded(-cfg.v_max_z, X[5, k], cfg.v_max_z))
+            opti.subject_to(opti.bounded(-cfg.v_max_z, X[5, k], cfg.v_max_z))  # limited to +- v_max_z
 
         # ── IPOPT solver ─────────────────────────────────────────────
         p_opts = {'expand': True, 'print_time': False}
@@ -461,12 +462,12 @@ class MPCTracker:
         # ── Initial guess ────────────────────────────────────────────
         if cfg.warm_start and self._prev_u is not None:
             try:
-                opti.set_initial(U, self._prev_u.T)
-                opti.set_initial(X, self._prev_x.T)
+                opti.set_initial(U, self._prev_u.T)   # in case of warm start available, employ
+                opti.set_initial(X, self._prev_x.T)   # previous solutions as initial guess
             except Exception:
                 self._default_guess(opti, X, U, x_ref)
         else:
-            self._default_guess(opti, X, U, x_ref)
+            self._default_guess(opti, X, U, x_ref)  # X = x_ref, U = 0 as default guess
 
         # ── Solve ────────────────────────────────────────────────────
         try:
@@ -481,6 +482,7 @@ class MPCTracker:
             except Exception:
                 cost_val = float('inf')
 
+        # Results
         U_opt  = np.array(sol.value(U))    # (NU, N)
         X_opt  = np.array(sol.value(X))    # (NX, N+1)
         u_seq  = U_opt.T                   # (N,  NU)
