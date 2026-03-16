@@ -175,7 +175,7 @@
     mpc_Q_vel_xy:    10.0      # horizontal velocity error
     mpc_Q_vel_z:     2.0      # vertical velocity error
     mpc_Q_yaw:       0.2      # heading error
-    mpc_Q_terminal: 50.0      # terminal cost multiplier (applied on top of Q_*)
+    mpc_Q_terminal: 10.0      # terminal cost multiplier (applied on top of Q_*)
 
     # Control effort weights
     mpc_R_acc_xy:    1.0      # horizontal acceleration
@@ -192,7 +192,7 @@
     #   penalty = W_obs_pts * max(0, d_safe_pts - n^T*(X_k - p_obs))^2
     # This directly penalises predicted states that encroach on obstacle points.
     mpc_d_safe_pts:          0.5    # [m]  safety clearance from each LiDAR point
-    mpc_W_obs_pts:          50.0    # penalty weight (higher → stronger avoidance)
+    mpc_W_obs_pts:          100.0    # penalty weight (higher → stronger avoidance)
     mpc_max_obs_constraints: 15     # max LiDAR points used per solve (nearest first)
     mpc_obs_check_radius:    3.0    # [m]  only points within this radius are used
 
