@@ -1,0 +1,84 @@
+# =============================================================================
+# G1 (Unitree humanoid) profile — deltas against config/planner_params.yaml
+# =============================================================================
+# Deep-merged on top of the base file:
+#
+#     load_planner("config/planner_params.yaml", "config/g1_overrides.yaml")
+#
+# The G1 uses the SAME motion model, dynamics and obstacle-avoidance term as the
+# legged (Go2) profile — kinematic_se2, mid-point integration, sigmoid barrier —
+# so this file only restates the numeric deltas a bipedal platform actually
+# needs, mirroring config/legged_overrides.yaml in both structure and intent.
+# Everything not listed here is shared verbatim with the other two platforms.
+#
+# Numbers below are carried over from the Unitree-G1 project's own mpc_planner
+# (a CasADi/IPOPT kinematic tracker of the same lineage, forward-Euler there,
+# mid-point here — see config/legged_overrides.yaml for why that swap is made
+# uniformly across every profile).
+# =============================================================================
+
+model:
+  type: kinematic_se2        # x = [px py psi], u = [vx vy omega]  (body frame)
+  integrator: midpoint       # RK2, as for the Go2 profile — see its comment
+
+common:
+  N: 20                       # shorter horizon than the other profiles (2.0 s
+                              # at dt=0.1): matches the source project's tuning
+  v_ref: 0.5                  # slower cruise speed than the Go2 profile (0.7)
+
+  # Comparable to the Go2's 1.0 m, tuned down for a bipedal gait.
+  lookahead_dist: 0.9
+
+  limits:
+    v_max_xy: 0.8             # [m/s] forward body-x speed
+    v_min_xy: 0.0              # NO REVERSE: a biped's admissible set is
+                              # one-sided in the forward direction, unlike the
+                              # Go2's symmetric U_Sigma.  Restricts U_Sigma
+                              # only; f_Sigma is untouched (see
+                              # ModelLimits.v_min_xy / KinematicSE2 docstring).
+    v_max_lat: 0.4            # [m/s] narrower lateral range than the Go2 (0.5)
+    yaw_rate_max: 1.0         # [rad/s] slower turning than the Go2 (1.5)
+
+  weights:
+    # Considerably tighter position tracking than the Go2 profile (30.0): the
+    # source project runs this against Nav2's costmap-aware global path, which
+    # already keeps clear of obstacles, so the local MPC is tuned to follow it
+    # closely rather than to deviate for avoidance on its own.
+    q_pos_xy: 200.0
+    q_yaw: 1.0
+    q_terminal: 100.0
+    r_lin_xy: 1.0
+    r_ang: 0.5
+    r_jerk: 0.5
+
+  obstacles:
+    - type: sigmoid_barrier
+      weight: 200.0
+      alpha: 4.0
+      r_safe: 0.5              # tighter than the Go2's 0.55: a narrower
+                                # bipedal footprint allows a smaller margin
+      max_points: 12
+      check_radius: 3.0
+
+  inner_loop:
+    kp_pos: 1.0
+    kd_pos: 0.0                # relative degree 1: no derivative term needed
+    kp_yaw: 1.5
+
+  solver:
+    max_iter: 100
+    warm_start: true
+
+  goal: [10.0, 0.0, 0.0]       # demo default; overridden at runtime by /global_goal,
+                               # exactly as for the other two profiles
+
+# =============================================================================
+# Deliberately NOT ported from the source project (see trajopt_ros/README.md
+# for the full rationale): dynamic-obstacle prediction and the associated
+# "yield" behaviour, the command slew-rate limiter, the per-input freshness
+# watchdogs, the cost-field RViz visualisation, and Nav2/SLAM as the global
+# layer. None of these exist in the aerial or Go2 instantiations either, and
+# adding them only for G1 would make the three platforms not comparable on the
+# same terms — which is the entire point of this package. They remain
+# available, in their original form, in the Unitree-G1 project.
+# =============================================================================

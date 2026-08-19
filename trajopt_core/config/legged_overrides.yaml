@@ -1,0 +1,52 @@
+# =============================================================================
+# Legged profile — deltas against config/planner_params.yaml
+# =============================================================================
+# Deep-merged on top of the base file:
+#
+#     load_planner("config/planner_params.yaml", "config/legged_overrides.yaml")
+#
+# This file IS the answer to "how much of the stack is platform-specific?".
+# Everything not listed here — horizon, reference generation, path conditioning,
+# SCA, obstacle strategy, grid, A*, solver settings — is shared verbatim with the
+# aerial platform.
+# =============================================================================
+
+# The only structural change: a different MotionModel.
+model:
+  type: kinematic_se2        # x = [px py psi], u = [vx vy omega]  (body frame)
+  integrator: midpoint       # RK2; 'euler' is one order less accurate for free
+
+common:
+  # Slower platform, so the reference advances more slowly.
+  v_ref: 0.7
+
+  # Shorter settling distance for the gait controller than for the drone's
+  # cascaded PID, so the published setpoint sits closer.
+  lookahead_dist: 1.0
+
+  limits:
+    v_max_xy: 1.0            # [m/s] the input IS a velocity here, not an
+                             # acceleration: this is U_Sigma, not X_Sigma
+    v_max_lat: 0.5           # set to 0 for a nonholonomic base
+
+  weights:
+    # Heading matters far more on a body-frame platform, where psi multiplies the
+    # translation, than on a world-frame one where it is decoupled.
+    q_yaw: 1.0
+    r_ang: 0.5
+
+  obstacles:
+    # Lists are replaced wholesale, not merged, so the term is restated in full.
+    - type: sigmoid_barrier
+      weight: 200.0
+      alpha: 4.0
+      r_safe: 0.55           # tighter than the drone's 0.7: smaller footprint
+      max_points: 10
+      check_radius: 3.0
+
+  inner_loop:
+    kp_pos: 1.0
+    kd_pos: 0.0              # relative degree 1: no derivative term needed
+    kp_yaw: 1.5
+
+  goal: [12.5, 0.0, 0.0]

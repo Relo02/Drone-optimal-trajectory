@@ -3,8 +3,15 @@
 
     # ──────────────────────────────────────────────────────────────────────────
     # MuJoCo model path (absolute)
+    #
+    # Left unset on purpose: skydio_sim_node's own _DEFAULT_MODEL_PATH resolves
+    # to ~/Drone-optimal-trajectory/mujoco/MuJoCo/..., which is correct on any
+    # machine that cloned the repository into $HOME.  This key used to hardcode
+    # one developer's home directory, so the simulation could not start
+    # anywhere else.  Set it here only to point at a scene kept outside the
+    # repository.
     # ──────────────────────────────────────────────────────────────────────────
-    model_path: "/home/lorenzo/Drone-optimal-trajectory/mujoco/MuJoCo/mujoco_menagerie-main/skydio_x2/skydio_world.xml"
+    # model_path: "/absolute/path/to/skydio_world.xml"
 
     # ──────────────────────────────────────────────────────────────────────────
     # Reference (goal) position [m] and heading [rad]

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>trajopt_core</name>
+  <version>0.1.0</version>
+  <description>
+    Platform-agnostic local trajectory optimisation: Gaussian occupancy grid,
+    rolling-horizon A* and a CasADi/IPOPT receding-horizon optimal control
+    problem, instantiated on an aerial and a legged robot through a common
+    MotionModel abstraction. Contains no ROS dependency by design.
+  </description>
+  <maintainer email="franci.pedrini@gmail.com">Francesco Pedrini</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

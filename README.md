@@ -2,6 +2,13 @@
 
 This repository contains a ROS2 + PX4 SITL + Gazebo stack for a quadrotor MPC with LiDAR-based obstacle avoidance. The MPC runs inside ROS2, consumes PX4 odometry and LaserScan data, and outputs trajectory setpoints with velocity feedforward.
 
+> **The current work lives in [`trajopt_core`](trajopt_core/README.md) and
+> [`trajopt_ros`](trajopt_ros/README.md)**: one platform-agnostic optimal control
+> problem, instantiated on three robots (Skydio X2 quadrotor, Unitree Go2,
+> Unitree G1). All commands for running them and for reproducing the report's
+> metrics are in **[`RUNNING.md`](RUNNING.md)**. Everything below documents the
+> earlier PX4/Gazebo stack, superseded by that package.
+
 ## Contents
 
 ### MPC v2 (Recommended)

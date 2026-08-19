@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>go2_mujoco</name>
+  <version>0.0.0</version>
+  <description>Unitree Go2 warehouse simulation in MuJoCo: the plant for the legged planner profile</description>
+  <maintainer email="franci.pedrini@gmail.com">francesco</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <!-- warehouse.launch.py includes trajopt_ros/launch/planner.launch.py -->
+  <exec_depend>trajopt_ros</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

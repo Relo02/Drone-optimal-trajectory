@@ -1,0 +1,216 @@
+# =============================================================================
+# trajopt_core — shared planner configuration
+# =============================================================================
+# One schema, two robots.  Everything under `common:` is platform-independent
+# and is consumed unchanged by both instantiations; `model:` is the only block
+# that knows what the robot is.
+#
+# That split is the configuration-level image of the architectural claim: the
+# optimal control problem depends on the platform solely through
+#
+#     f_Sigma   discrete dynamics        model.type
+#     U_Sigma   input bounds             common.limits (interpreted by the model)
+#     X_Sigma   state constraints        common.limits (interpreted by the model)
+#     C         CoM output map           fixed by the model
+#
+# Load with:
+#     from trajopt_core.config_io import load_planner
+#     setup = load_planner("config/planner_params.yaml")
+#
+# This file carries the AERIAL profile.  The legged profile is at the bottom,
+# commented out: swapping the two `model:` blocks and the marked overrides is
+# the entire difference between the two robots.
+# =============================================================================
+
+common:
+
+  # ---------------------------------------------------------------------------
+  # Prediction horizon
+  # ---------------------------------------------------------------------------
+  N: 25                      # prediction steps
+  dt: 0.1                    # [s] discretisation step  -> horizon = N*dt = 2.5 s
+
+  # ---------------------------------------------------------------------------
+  # Reference generation along the A* path
+  # ---------------------------------------------------------------------------
+  v_ref: 1.0                 # [m/s] cruise speed used to advance the reference
+  z_ref: 1.5                 # [m]   planning height (ignored by planar models)
+  anchor_first_to_state: false
+
+  # An 8-connected A* can only emit headings that are multiples of 45 deg, so the
+  # yaw reference derived from its tangent chatters at the cell scale.  A
+  # world-frame relative-degree-2 platform merely tracks that badly; a body-frame
+  # relative-degree-1 platform will rotate instead of advancing.  Set both to 0
+  # to recover the raw grid polyline.
+  path_resample_ds: 0.20     # [m] uniform arc-length resampling (0 = off)
+  path_smooth_window: 5      # moving-average width (0 or <3 = off)
+
+  # ---------------------------------------------------------------------------
+  # Successive convex approximation
+  # ---------------------------------------------------------------------------
+  # Number of re-linearisations of the half-space obstacle terms per cycle.
+  # 1 is cheap and adequate while the previous solution stays collision-free; if
+  # the linearisation trajectory ever pierces an obstacle, the steps beyond it
+  # generate opposing normals and the resulting half-spaces are contradictory —
+  # the tell-tale sign is a slack that no longer responds to its penalty weight.
+  sca_iterations: 1
+
+  # ---------------------------------------------------------------------------
+  # Terminal ingredients
+  # ---------------------------------------------------------------------------
+  # Terminal equality constraint v_N = 0: the horizon must end at an equilibrium.
+  # Buys nominal recursive feasibility and has a direct physical reading — a safe
+  # braking trajectory always exists inside the horizon.  Only meaningful for
+  # platforms whose state contains a velocity.
+  terminal_zero_velocity: false
+
+  # ---------------------------------------------------------------------------
+  # Setpoint published to the platform inner loop
+  # ---------------------------------------------------------------------------
+  # The MPC is a reference generator, not a direct controller: it publishes the
+  # first predicted state at least this far away.  The value is not free — it
+  # encodes the settling distance of the inner loop, and it must exceed
+  # v_ref * dt (0.10 m here) or the loop chatters.
+  lookahead_dist: 1.2
+
+  # ---------------------------------------------------------------------------
+  # Kinematic / dynamic limits.  Each model consumes the entries that apply to
+  # it: a relative-degree-2 platform bounds accelerations, a relative-degree-1
+  # one bounds velocities.
+  # ---------------------------------------------------------------------------
+  limits:
+    v_max_xy: 2.0            # [m/s]
+    v_max_z: 1.0             # [m/s]
+    a_max_xy: 2.0            # [m/s^2]   aerial only  (~ g*tan(phi_max))
+    a_max_z: 1.5             # [m/s^2]   aerial only
+    yaw_rate_max: 1.5        # [rad/s]
+    v_max_lat: 0.5           # [m/s]     SE(2) only; set to 0 for a nonholonomic base
+
+  # ---------------------------------------------------------------------------
+  # Cost weights, expressed in semantic terms so one schema serves both robots.
+  # `r_lin_*` / `r_ang` weight the COMMANDED INPUT whatever its physical nature:
+  # an acceleration for a relative-degree-2 platform, a velocity for a
+  # relative-degree-1 one.  Entries that a model has no state for are ignored.
+  # ---------------------------------------------------------------------------
+  weights:
+    q_pos_xy: 30.0           # horizontal position error
+    q_pos_z: 20.0            # altitude error
+    q_vel_xy: 10.0           # horizontal velocity error   (ignored if no v state)
+    q_vel_z: 2.0             # vertical velocity error     (ignored if no v state)
+    q_yaw: 0.2               # heading error
+    q_terminal: 10.0         # multiplier applied on top of the stage Q
+    r_lin_xy: 1.0
+    r_lin_z: 1.5
+    r_ang: 0.1
+    r_jerk: 0.3              # penalty on delta-u
+
+  # ---------------------------------------------------------------------------
+  # Obstacle avoidance — a list of terms, combined additively.
+  #
+  #   grid_bspline       C^2 soft cost read off the Gaussian grid.  Parametric,
+  #                      so it does not force a rebuild of the NLP.
+  #   sigmoid_barrier    C^inf logistic barrier on the nearest LiDAR points.
+  #                      `alpha` plays the role of an inverse barrier parameter:
+  #                      steeper means better avoidance and worse conditioning.
+  #   halfspace_hinge2   C^1 squared hinge on the SCA half-spaces.  Convex, but
+  #                      its Hessian jumps on the activation surface.
+  #   slacked_halfspace  SCA half-space as a constraint with slack.
+  #                      penalty: l1 -> EXACT (zero violation once rho > |mu*|)
+  #                      penalty: l2 -> residual ~ mu*/(2 rho), never zero
+  # ---------------------------------------------------------------------------
+  obstacles:
+    - type: sigmoid_barrier
+      weight: 200.0
+      alpha: 4.0
+      r_safe: 0.7
+      max_points: 10
+      check_radius: 3.0
+
+    # The grid B-spline is available but off by default.  Measured on the
+    # corridor scenario at N=25 with a 40x40 grid, same iteration count:
+    #
+    #     parametric: true    13582 ms/solve   (graph built once)
+    #     parametric: false      35 ms/solve   (graph rebuilt each cycle)
+    #     sigmoid barrier only   32 ms/solve   (graph built once)
+    #
+    # With symbolic coefficients CasADi cannot exploit the spline structure, so
+    # the derivative callbacks dominate.  Enable it with `parametric: false` if
+    # the smooth field is wanted in the cost; the grid is used by A* either way.
+    #
+    # - type: grid_bspline
+    #   weight: 100.0
+    #   half_width: 5.0
+    #   reso: 0.25
+    #   parametric: false
+
+  # ---------------------------------------------------------------------------
+  # Occupancy grid.  Note that P = 1 - Phi(d/std) saturates at 0.5, so an
+  # obstacle threshold at or above 0.5 never fires.  The implied hard-blocking
+  # radius is  d = std * Phi^-1(1 - threshold), e.g. 0.90 m for (0.7, 0.1).
+  # ---------------------------------------------------------------------------
+  grid:
+    reso: 0.25               # [m] cell size
+    half_width: 5.0          # [m] half-extent -> 10 m x 10 m window
+    std: 0.7                 # [m] Gaussian spread per obstacle point
+    max_lidar_range: 6.0     # [m] range filter applied before building the grid
+
+  # ---------------------------------------------------------------------------
+  # A* on the occupancy grid
+  # ---------------------------------------------------------------------------
+  astar:
+    obstacle_threshold: 0.1     # cells with P >= this are hard obstacles
+    obstacle_cost_weight: 15.0  # soft multiplier: cost = 1 + w * P
+    replan_rate_hz: 5.0         # the global layer is the slower one
+    goal_reached_radius: 0.3    # [m]
+    planning_height: 1.5        # [m] z assigned to the 2-D waypoints
+
+  # ---------------------------------------------------------------------------
+  # IPOPT.  Interior point rather than active set: every horizon step carries up
+  # to `max_points` obstacle terms plus the input box and the speed constraints,
+  # i.e. several hundred inequalities — squarely in the interior-point regime.
+  # ---------------------------------------------------------------------------
+  solver:
+    max_iter: 100
+    print_level: 0
+    expand: true             # scalarise the graph (SX) for faster evaluation
+    warm_start: true         # shift the previous solution by one step
+
+  # ---------------------------------------------------------------------------
+  # Reference inner loop, used ONLY by the offline closed-loop simulator in
+  # trajopt_core.bench.  On the robot these gains live in the platform layer
+  # (cascaded PID / setpoint_to_cmd_vel_node) and this block is ignored.
+  # ---------------------------------------------------------------------------
+  inner_loop:
+    kp_pos: 0.9
+    kd_pos: 1.2              # relative-degree-2 platforms only
+    kp_yaw: 1.5
+
+  # Global goal in the world frame; overridden at runtime by /global_goal.
+  goal: [20.0, 1.0, 1.5]
+
+
+# =============================================================================
+# Platform block — the ONLY part that knows what the robot is
+# =============================================================================
+model:
+  type: double_integrator_z   # aerial: x = [px py pz vx vy vz psi], u = [ax ay az psi_dot]
+                              # relative degree 2 (the inner attitude loop cannot
+                              # change velocity instantaneously)
+
+# -----------------------------------------------------------------------------
+# Legged profile — swap the block above for the one below, and apply the
+# overrides listed in the comments.
+# -----------------------------------------------------------------------------
+# model:
+#   type: kinematic_se2       # x = [px py psi], u = [vx vy omega]  (body frame)
+#   integrator: midpoint      # 'euler' is first order; 'midpoint' (RK2) is second
+#                             # order at the cost of one addition
+#
+# Overrides for the legged platform:
+#   common.v_ref: 0.7
+#   common.lookahead_dist: 1.0
+#   common.limits.v_max_xy: 1.0
+#   common.weights.q_yaw: 1.0        # heading matters: it multiplies the translation
+#   common.weights.r_ang: 0.5
+#   common.obstacles[1].r_safe: 0.55
+#   common.inner_loop: {kp_pos: 1.0, kp_yaw: 1.5}

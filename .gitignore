@@ -9,3 +9,12 @@ mujoco/myenv
 mujoco/ros2_ws/build/
 mujoco/ros2_ws/install/
 mujoco/ros2_ws/log/
+mujoco/MuJoCo/mujoco_menagerie-main/
+# metric artefacts written by RUNNING.md (cross_platform_demo --out, rosbag)
+results/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+mujoco/model/g1/
+mujoco/model/go2/

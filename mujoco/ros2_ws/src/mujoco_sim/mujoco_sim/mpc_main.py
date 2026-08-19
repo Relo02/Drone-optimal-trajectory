@@ -12,6 +12,9 @@ Runs the MuJoCo drone simulation with:
 author: Lorenzo Ortolani
 """
 
+import os
+import pathlib
+
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -377,13 +380,41 @@ class MujocoSimNode(Node):
         self.lidar_pub.publish(msg)
 
 
+
+def _default_model_path() -> str:
+    """
+    Locate `mujoco/model/drone_world.xml` from the installed package.
+
+    The path used to be hardcoded to one developer's home directory, so the
+    simulation could only ever start on that machine.  It is resolved from the
+    repository layout instead, and overridable with the MUJOCO_DRONE_WORLD
+    environment variable for anyone keeping the scene elsewhere.
+    """
+    override = os.environ.get("MUJOCO_DRONE_WORLD")
+    if override:
+        return override
+
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "mujoco" / "model" / "drone_world.xml"
+        if candidate.is_file():
+            return str(candidate)
+        candidate = parent / "model" / "drone_world.xml"
+        if candidate.is_file():
+            return str(candidate)
+    raise SystemExit(
+        "drone_world.xml not found. Set MUJOCO_DRONE_WORLD to its full path, "
+        "e.g. <repo>/mujoco/model/drone_world.xml"
+    )
+
+
 def main():
     # Initialize ROS2
     rclpy.init()
     ros_node = MujocoSimNode()
 
     # Load MuJoCo model
-    model = mujoco.MjModel.from_xml_path('/home/lorenzo/Drone-optimal-trajectory/mujoco/model/drone_world.xml')
+    model = mujoco.MjModel.from_xml_path(_default_model_path())
     data = mujoco.MjData(model)
 
     # Initialize flight logger
