@@ -14,16 +14,17 @@ from mujoco_sim.gaussian_grid_map import GaussianGridMap
 
 
 class Node:
-    """A* search node."""
+    """A* search node: is the basic block of the search grid"""
 
     def __init__(self, ix, iy, cost, parent_index):
-        self.ix = ix  # grid index x
-        self.iy = iy  # grid index y
-        self.cost = cost  # g(n): cost from start
-        self.parent_index = parent_index  # parent node index
+        self.ix = ix  # x coordinate on the grid
+        self.iy = iy  # y coordinate on the grid
+        self.cost = cost  # g(n): cost from starting node to this node
+        self.parent_index = parent_index  # parent node index (node before this one in the path)
 
     def __lt__(self, other):
-        return self.cost < other.cost
+        return self.cost < other.cost  # needed for retrieving the node with the lowest cost
+                                       # from the priority queue of A* algorithm
 
 
 class AStarLocalPlanner:
@@ -40,7 +41,7 @@ class AStarLocalPlanner:
         [0, 1, 1.0],    # up
         [-1, 0, 1.0],   # left
         [0, -1, 1.0],   # down
-        [1, 1, 1.414],  # right-up (diagonal)
+        [1, 1, 1.414],  # right-up (diagonal so we have sqrt(2) ~ 1.414)
         [1, -1, 1.414], # right-down
         [-1, 1, 1.414], # left-up
         [-1, -1, 1.414] # left-down
@@ -52,7 +53,7 @@ class AStarLocalPlanner:
 
         Args:
             obstacle_threshold: Probability above which a cell is considered blocked
-            obstacle_cost_weight: Weight for obstacle probability in cost function
+            obstacle_cost_weight: Weight for obstacle probability in cost function (tell how much the planner is "afraid" of obstacles)
         """
         self.obstacle_threshold = obstacle_threshold
         self.obstacle_cost_weight = obstacle_cost_weight
@@ -65,7 +66,7 @@ class AStarLocalPlanner:
         self.grid_map = grid_map
 
     def world_to_grid(self, x, y):
-        """Convert world coordinates to grid indices."""
+        """Convert from continuous world coordinates to discrete grid indices."""
         if self.grid_map is None:
             return None, None
         ix = int((x - self.grid_map.minx) / self.grid_map.xyreso)
@@ -73,7 +74,7 @@ class AStarLocalPlanner:
         return ix, iy
 
     def grid_to_world(self, ix, iy):
-        """Convert grid indices to world coordinates (cell center)."""
+        """Convert from discrete grid indices to world coordinates (cell center is considered)."""
         if self.grid_map is None:
             return None, None
         x = ix * self.grid_map.xyreso + self.grid_map.minx
@@ -85,13 +86,13 @@ class AStarLocalPlanner:
         if self.grid_map is None or self.grid_map.gmap is None:
             return False
 
-        # Check bounds
+        # Check bounds (false if outside the grid map)
         if ix < 0 or ix >= self.grid_map.xw:
             return False
         if iy < 0 or iy >= self.grid_map.yw:
             return False
 
-        # Check obstacle probability
+        # Check obstacle probability (if above threshold, cell is not valid, so false)
         prob = self.grid_map.gmap[ix, iy]
         if prob >= self.obstacle_threshold:
             return False
@@ -105,14 +106,13 @@ class AStarLocalPlanner:
         Higher probability = higher cost, encouraging paths away from obstacles.
         """
         if self.grid_map is None or self.grid_map.gmap is None:
-            return float('inf')
+            return float('inf')  # no map means we cannot plan, so return infinite cost
 
         if not self.is_valid_cell(ix, iy):
-            return float('inf')
+            return float('inf')  # invalid cells have infinite cost
 
-        prob = self.grid_map.gmap[ix, iy]
-        # Base cost + weighted probability cost
-        return 1.0 + self.obstacle_cost_weight * prob
+        prob = self.grid_map.gmap[ix, iy]  # obstacle probability at this cell
+        return 1.0 + self.obstacle_cost_weight * prob  # base cost + weighted probability cost
 
     def heuristic(self, ix, iy, gix, giy):
         """Euclidean distance heuristic."""
@@ -134,9 +134,9 @@ class AStarLocalPlanner:
         """
         gix, giy = self.world_to_grid(goal_world[0], goal_world[1])
 
-        # Check if goal is within grid
+        # Check if goal coordinates are within grid
         if 0 <= gix < self.grid_map.xw and 0 <= giy < self.grid_map.yw:
-            # Goal is inside grid, but check if it's blocked
+            # Goal is inside grid, but check if it's blocked (if it's inside an obstacle)
             if self.is_valid_cell(gix, giy):
                 return gix, giy
             # Goal cell is blocked, find nearest valid cell
@@ -146,11 +146,11 @@ class AStarLocalPlanner:
         six, siy = self.world_to_grid(start_world[0], start_world[1])
 
         # Direction from start to goal
-        dx = gix - six
-        dy = giy - siy
+        dx = gix - six  # goal_x - start_x in grid coordinates
+        dy = giy - siy  # goal_y - start_y in grid coordinates
 
         if dx == 0 and dy == 0:
-            return six, siy
+            return six, siy   # since it means gix = six and giy = siy 
 
         # Find boundary intersection using parametric line
         t_values = []
@@ -159,58 +159,60 @@ class AStarLocalPlanner:
             t_left = -six / dx if dx != 0 else float('inf')
             t_right = (self.grid_map.xw - 1 - six) / dx if dx != 0 else float('inf')
             if dx > 0:
-                t_values.append(t_right)
+                t_values.append(t_right)  # goal on the right wrt start node
             else:
-                t_values.append(t_left)
+                t_values.append(t_left)  # goal on the left wrt start node
 
         if dy != 0:
             t_bottom = -siy / dy if dy != 0 else float('inf')
             t_top = (self.grid_map.yw - 1 - siy) / dy if dy != 0 else float('inf')
             if dy > 0:
-                t_values.append(t_top)
+                t_values.append(t_top)  # goal above start node
             else:
-                t_values.append(t_bottom)
+                t_values.append(t_bottom)  # goal below start node
 
-        # Get minimum positive t
+        # Get minimum positive t 
         t = min([t for t in t_values if t > 0], default=0)
-        t = min(t, 1.0)  # Don't go past the goal
+        t = min(t, 1.0)  # t should be always less than 1, since thid code is runned only if
+                         # the goal is outside the grid. To be robust, take the minimum 
+                         # between t and 1.0, so that we ensure to not go past the goal
 
-        # Calculate boundary point
-        bix = int(six + t * dx * 0.95)  # 0.95 to stay inside
-        biy = int(siy + t * dy * 0.95)
+        # Calculate boundary point 
+        bix = int(six + t * dx * 0.95)  # 0.95 to stay safely inside the grid boundaries
+        biy = int(siy + t * dy * 0.95)  # (since six + t*dx is exactly on the grid boundary)
 
-        # Clamp to grid bounds
+        # Clamp boundary coordinates to grid bounds
         bix = max(0, min(bix, self.grid_map.xw - 1))
         biy = max(0, min(biy, self.grid_map.yw - 1))
 
         if self.is_valid_cell(bix, biy):
             return bix, biy
 
-        return self._find_nearest_valid_cell(bix, biy)
+        return self._find_nearest_valid_cell(bix, biy)  # in case the boundary point is blocked
 
     def _find_nearest_valid_cell(self, ix, iy):
         """Find the nearest valid cell to the given position using BFS (Breadth-First Search)."""
         if self.is_valid_cell(ix, iy):
             return ix, iy
 
-        visited = set()
-        queue = [(ix, iy)]
-        visited.add((ix, iy))
+        visited = set()  # keep track of visited cells
+        queue = [(ix, iy)]  # create a queue starting with the initial position
+        visited.add((ix, iy))  # initial position is already visited clearly
 
         while queue:
-            cx, cy = queue.pop(0)
+            cx, cy = queue.pop(0)  # get the first cell from queue
             for motion in self.MOTION:
-                nx = cx + motion[0]
-                ny = cy + motion[1]
+                nx = cx + motion[0]  # find next x coordinate
+                ny = cy + motion[1]  # find next y coordinate
 
                 if (nx, ny) in visited:
-                    continue
+                    continue   # skip if already visited
 
                 if 0 <= nx < self.grid_map.xw and 0 <= ny < self.grid_map.yw:
                     if self.is_valid_cell(nx, ny):
-                        return nx, ny
+                        return nx, ny  # search ended
                     visited.add((nx, ny))
-                    queue.append((nx, ny))
+                    queue.append((nx, ny))  # otherwise, add to visited and append to queue
 
         # No valid cell found, return original
         return ix, iy

@@ -84,7 +84,7 @@ class FixedGaussianGridMap:
         self.gmap = np.zeros((self.cells, self.cells), dtype=np.float32)
 
         if lidar_points is None or len(lidar_points) == 0:
-            return False
+            return False   # no obstacles, map is empty but valid
 
         # Project to 2-D and discard points that fall outside the fixed window
         ox = np.asarray(lidar_points[:, 0], dtype=float)
@@ -97,7 +97,7 @@ class FixedGaussianGridMap:
         oy = oy[mask]
 
         if len(ox) == 0:
-            return False
+            return False   # all points fall outside the fixed window
 
         # Build grid-centre coordinate arrays
         ix_arr = np.arange(self.cells, dtype=float)
@@ -117,7 +117,7 @@ class FixedGaussianGridMap:
 
         # Gaussian CDF: P(cell is occupied) increases as distance to obstacles decreases
         self.gmap = (1.0 - norm.cdf(min_dists, 0.0, self.std)).astype(np.float32)
-        return True
+        return True   # at least one point contributed to the map (no empty map)
 
     # ------------------------------------------------------------------
     # Coordinate helpers
@@ -125,7 +125,7 @@ class FixedGaussianGridMap:
 
     def world_to_index(self, x: float, y: float):
         """
-        World coordinates -> grid indices.
+        Continuous world coordinates -> discretized grid indices.
         Returns (ix, iy) inside [0, cells), or (None, None) if outside.
         """
         ix = int((x - self.minx) / self.reso)
@@ -135,14 +135,14 @@ class FixedGaussianGridMap:
         return None, None
 
     def index_to_world(self, ix: int, iy: int):
-        """Grid indices -> world coordinates at cell centre."""
+        """Discretized grid indices -> world coordinates at cell centre."""
         return (
             ix * self.reso + self.minx,
             iy * self.reso + self.miny,
         )
 
     def get_probability(self, x: float, y: float) -> float:
-        """Obstacle probability at world (x, y); 0.0 if outside grid or not yet updated."""
+        """Obstacle probability at world (x, y);  0.0 if outside grid or not yet updated."""
         if self.gmap is None:
             return 0.0
         ix, iy = self.world_to_index(x, y)
@@ -162,9 +162,9 @@ class FixedGaussianGridMap:
     def maxy(self) -> float:
         return self.miny + 2.0 * self.half_width
 
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
     # Visualisation helper — call from an external visualiser, not in a loop here
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
 
     def draw_heatmap(self, ax, cmap: str = 'hot', alpha: float = 0.7):
         """
